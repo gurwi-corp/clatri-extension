@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Clatri",
+  "version": "0.9.2",
+  "description": "Official Clatri extension. Export your bank transactions to CSV — the browser companion to your AI agent for money, health and life.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.png"],
+      "matches": ["https://*.bancolombia.com/*"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://*.bancolombia.com/*"],
+      "js": ["src/bridge.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://*.bancolombia.com/*"],
+      "js": [
+        "src/core/shape.js",
+        "src/core/registry.js",
+        "src/banks/co-bancolombia.js",
+        "src/core/engine.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": ["https://*.bancolombia.com/*"],
+      "js": ["src/core/export.js", "src/ui/panel.js"],
+      "run_at": "document_idle",
+      "world": "MAIN",
+      "all_frames": false
+    }
+  ]
+}
