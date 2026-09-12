@@ -237,8 +237,8 @@ await hookedFetch(appTxUrl, {
   }),
 });
 await flush();
-ok("transactions template captured", Boolean(engine.state.template), JSON.stringify(engine.state.template));
-check("template keeps the real url", engine.state.template.url, appTxUrl);
+ok("transactions template captured", Boolean(engine.state.templates.deposit), JSON.stringify(engine.state.templates));
+check("template keeps the real url", engine.state.templates.deposit.url, appTxUrl);
 
 // The app may call fetch("/api/...") rather than an absolute URL.
 fetchImpl = async () => respond(accountsResponse);
@@ -409,7 +409,7 @@ ok("reports that it cannot paginate", untouched.canPaginate === false);
 
 // 8. engine paging + dedupe --------------------------------------------------
 console.log("\npaging");
-engine.state.template = template;
+engine.state.templates = { deposit: template };
 engine.state.headers = {
   authorization: "Bearer live-token",
   "device-id": "dev-1",
@@ -467,7 +467,7 @@ ok(
 // Past the last page the gateway errors instead of returning an empty one.
 // Throwing there used to discard every row already collected.
 console.log("\nrunning out of pages");
-engine.state.template = template;
+engine.state.templates = { deposit: template };
 engine.state.headersByUrl = {};
 engine.state.headers = { authorization: "Bearer live-token" };
 
@@ -660,7 +660,7 @@ engine.state.headers = {
   "message-id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
   "request-timestamp": "2026-01-01 00:00:00:000",
 };
-engine.state.template = {
+engine.state.templates.deposit = {
   ...template,
   headers: {
     authorization: "Bearer stale-token",
@@ -699,7 +699,7 @@ const accountsUrl =
 const fraudUrl =
   "https://canalpersonas-ext.apps.bancolombia.com/super-svp/api/v1/security-filters/fraud-monitoring/transactionalRiskAssessment";
 
-engine.state.template = null;
+engine.state.templates = {};
 engine.state.accountsUrl = accountsUrl;
 engine.state.headersByUrl = {
   [accountsUrl]: { authorization: "Bearer a", "device-id": "dev-1", channel: "SVP" },
@@ -748,7 +748,7 @@ const core = {
   ip: "1.2.3.4",
   "session-tracker": "sess-1",
 };
-engine.state.template = null;
+engine.state.templates = {};
 engine.state.accountsUrl = `${svc}/ch-ms-deposits/hybrid/accounts/customization/consolidated-balance`;
 engine.state.headersByUrl = {
   [engine.state.accountsUrl]: { ...core, filter_list: "belongs-to-the-accounts-call" },
@@ -804,7 +804,7 @@ check("non-uuid message id preserved", oddHeaders["message-id"], "SVP-000123");
 // With no date filter to rewrite, the selected range would be cosmetic. Refuse
 // the export before making a bank request instead of producing a plausible but
 // incomplete file.
-engine.state.template = dateless;
+engine.state.templates = { deposit: dateless };
 fetchCalls = [];
 fetchImpl = async (url, init) => {
   fetchCalls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
@@ -824,7 +824,7 @@ try {
 check("no call when the selected range cannot be applied", fetchCalls.length, 0);
 ok("explains how to capture a request with dates", /open movimientos/i.test(datelessError), datelessError);
 
-engine.state.template = template;
+engine.state.templates = { deposit: template };
 fetchImpl = async () => ({ ok: false, status: 401, text: async () => "token invalido" });
 let caught = "";
 try {
@@ -833,6 +833,290 @@ try {
   caught = error.message;
 }
 ok("401 explained to the user", /session expired/i.test(caught), caught);
+
+// 8b. credit cards ----------------------------------------------------------
+// The card service is a different microservice with a different body, keyed by
+// an encrypted token rather than an account number, and with no date filter.
+console.log("\ncredit cards");
+const listCardsUrl = `${svc}/ch-ms-transactional-creditcard-consult/credit-card/list-cards`;
+const cardTxUrl = `${svc}/super-svp-ch-ms-transactional-creditcard-consult/list-transactions-credit-card`;
+const cardsResponse = {
+  data: {
+    cards: [
+      {
+        logo: "407",
+        description: "VISA GOLD",
+        segment: "PER",
+        franchise: "Visa",
+        bin: "000000",
+        customerCard: {
+          number: { masked: "************1234", enc: "ENC-TOKEN-1234" },
+          typeCode: "1",
+          status: "ACTIVA",
+          limit: 5000000,
+          balance: [
+            { description: "DEUDA_A_LA_FECHA", amount: 1500000, currency: "COP" },
+            { description: "SALDO_DISPONIBLE", amount: 3500000, currency: "COP" },
+          ],
+        },
+        customName: null,
+      },
+    ],
+    pagination: { hasMoreRecords: false },
+  },
+};
+const cards = bank.parseAccounts(cardsResponse, listCardsUrl);
+check("one card parsed", cards.length, 1);
+check("card addressed by its masked number", cards[0].number, "************1234");
+check("card keeps the bank's token", cards[0].card, { masked: "************1234", enc: "ENC-TOKEN-1234" });
+check("card labelled", cards[0].typeLabel, "Credit card");
+check("card kind", cards[0].kind, "card");
+check("available credit shown as balance", cards[0].balance, 3500000);
+check("card named after the product", cards[0].name, "VISA GOLD");
+check("card remembers where its list came from", cards[0].sourceUrl, listCardsUrl);
+ok("a card list is not read as transactions", bank.parseTransactions(cardsResponse).length === 0);
+
+// The card detail carries a payment plan whose rows have a date and an amount.
+// Those are not movements.
+const cardDetail = {
+  data: {
+    card: {
+      customerCard: { number: { masked: "************1234", enc: "ENC-TOKEN-1234" } },
+      paymentPlan: {
+        dueDate: "2026-09-16",
+        paymentPlanSummary: [
+          { paymentType: "PAGO_MINIMO", amount: 79000, currency: "COP", paymentDate: "2026-09-16" },
+          { paymentType: "PAGO_TOTAL", amount: 790000, currency: "COP", paymentDate: "2026-09-16" },
+        ],
+      },
+    },
+  },
+};
+ok("a card's payment plan is not read as transactions", bank.parseTransactions(cardDetail).length === 0);
+ok("a card's detail is not read as an account list", bank.parseAccounts(cardDetail).length === 0);
+
+const cardTxResponse = (rows, more = false) => ({
+  data: { cardTransactions: rows, pagination: { hasMoreRecords: more } },
+});
+const cardRow = (id, description, date, amount, extra = {}) => ({
+  id,
+  description,
+  date,
+  billingDate: "0000-00-00",
+  amount,
+  outstandingBalance: amount,
+  currency: "COP",
+  installment: 1,
+  billedInstallments: 0,
+  allowDeferring: true,
+  isPosted: true,
+  authorizationCode: null,
+  ...extra,
+});
+const cardTx = bank.parseTransactions(
+  cardTxResponse([
+    cardRow("", "EXAMPLE STORE", "2026-09-12", 289900, { isPosted: false }),
+    cardRow("74000000000000000000001", "EXAMPLE CAFE", "2026-09-06", 19000),
+    cardRow("", "ABONO SUCURSAL VIRTUAL", "2026-08-24", -1998966, { installment: 0 }),
+  ])
+);
+check("purchases become outflows and payments inflows", cardTx.map((t) => t.amount), [-289900, -19000, 1998966]);
+check("unposted rows flagged", cardTx.map((t) => t.bankType), ["PENDIENTE", "", ""]);
+check("the bank's id becomes the reference", cardTx[1].reference, "74000000000000000000001");
+check("card dates already iso", cardTx[0].date, "2026-09-12");
+
+console.log("\ncard request building");
+const card = cards[0];
+const cardTemplate = {
+  url: cardTxUrl,
+  method: "POST",
+  body: {
+    data: {
+      card: { number: { masked: "************9999", enc: "ANOTHER-CARDS-TOKEN" } },
+      filters: { includeUnposted: true },
+      pagination: { pageNumber: 1 },
+    },
+  },
+};
+const cardReplay = bank.buildTransactionsRequest({
+  account: card,
+  from: "2026-09-01",
+  to: "2026-09-30",
+  page: 2,
+  template: cardTemplate,
+});
+check("card token swapped", cardReplay.body.data.card.number, { masked: "************1234", enc: "ENC-TOKEN-1234" });
+check("card page moved", cardReplay.body.data.pagination.pageNumber, 2);
+check("unposted filter preserved", cardReplay.body.data.filters.includeUnposted, true);
+ok("no date filter to apply", cardReplay.rangeApplied === false);
+ok("can paginate", cardReplay.canPaginate === true);
+ok("card template not mutated", cardTemplate.body.data.card.number.enc === "ANOTHER-CARDS-TOKEN");
+
+const cardFresh = bank.buildTransactionsRequest({
+  account: card,
+  from: "2026-09-01",
+  to: "2026-09-30",
+  page: 1,
+  template: null,
+});
+check("card endpoint derived from the card list", cardFresh.url, cardTxUrl);
+check("fresh card body matches the portal's shape", cardFresh.body, {
+  data: {
+    card: { number: { masked: "************1234", enc: "ENC-TOKEN-1234" } },
+    filters: { includeUnposted: true },
+    pagination: { pageNumber: 1 },
+  },
+});
+check(
+  "card endpoint follows a moved gateway",
+  bank.buildTransactionsRequest({
+    account: { ...card, sourceUrl: "https://newgateway.apps.bancolombia.com/svp/security-filters/ch-ms-transactional-creditcard-consult/credit-card/list-cards" },
+    from: "2026-09-01",
+    to: "2026-09-30",
+    page: 1,
+    template: null,
+  }).url,
+  "https://newgateway.apps.bancolombia.com/svp/security-filters/super-svp-ch-ms-transactional-creditcard-consult/list-transactions-credit-card"
+);
+ok("a deposit body is never reused for a card", cardReplay.body.account === undefined);
+check("deposit call classified", bank.kindOfRequest({ url: appTxUrl, body: template.body }), "deposit");
+check("card call classified by url", bank.kindOfRequest({ url: cardTxUrl, body: cardTemplate.body }), "card");
+check("card call classified by body alone", bank.kindOfRequest({ url: "https://x.bancolombia.com/y", body: cardTemplate.body }), "card");
+ok("cards cannot be queried by date", bank.profileFor(card).dateFilter === "none");
+ok("deposits keep the adapter-wide settings", Object.keys(bank.profileFor(account)).length === 0);
+ok("a deposit account still builds a deposit body", bank.buildTransactionsRequest({ account, from: "2026-07-01", to: "2026-07-31", page: 1, template: null }).body.account !== undefined);
+
+console.log("\ncards and accounts side by side");
+engine.state.accountsByUrl = {};
+engine.state.accounts = [];
+engine.state.templates = {};
+engine.state.headersByUrl = {};
+fetchImpl = async () => respond(accountsResponse);
+await hookedFetch(accountsUrl, { method: "GET", headers: appHeaders });
+await flush();
+fetchImpl = async () => respond(cardsResponse);
+await hookedFetch(listCardsUrl, {
+  method: "POST",
+  headers: appHeaders,
+  body: JSON.stringify({ data: { pagination: { pageSize: 20, lastCard: "" } } }),
+});
+await flush();
+check(
+  "deposit accounts and cards listed together",
+  engine.state.accounts.map((a) => a.number),
+  ["00000000000", "12345678901", "************1234"]
+);
+fetchImpl = async () => respond(cardsResponse);
+await hookedFetch(listCardsUrl, { method: "POST", headers: appHeaders, body: "{}" });
+await flush();
+check("listing cards again does not duplicate them", engine.state.accounts.length, 3);
+
+fetchImpl = async () => respond(txResponse(pages[1]));
+await hookedFetch(appTxUrl, { method: "POST", headers: appHeaders, body: JSON.stringify(template.body) });
+await flush();
+fetchImpl = async () => respond(cardTxResponse([cardRow("1", "EXAMPLE CAFE", "2026-09-06", 19000)]));
+await hookedFetch(cardTxUrl, { method: "POST", headers: appHeaders, body: JSON.stringify(cardTemplate.body) });
+await flush();
+check("one template per kind", Object.keys(engine.state.templates).sort(), ["card", "deposit"]);
+ok("the deposit template survives a card capture", engine.state.templates.deposit.url === appTxUrl);
+ok("the card template is the card call", engine.state.templates.card.url === cardTxUrl);
+ok("each account gets its own template", engine.templateFor(card).url === cardTxUrl && engine.templateFor(account).url === appTxUrl);
+
+console.log("\nwalking a card's history");
+engine.state.headers = { authorization: "Bearer live-token" };
+const cardHistory = {
+  1: [
+    cardRow("", "PENDING", "2026-09-12", 1000, { isPosted: false }),
+    cardRow("1", "SEPT A", "2026-09-06", 19000),
+    cardRow("2", "SEPT B", "2026-09-01", 9500),
+  ],
+  2: [
+    cardRow("", "AUG FEE", "2026-08-30", 25893, { installment: 0 }),
+    cardRow("", "AUG PAYMENT", "2026-08-24", -83007, { installment: 0 }),
+  ],
+  3: [cardRow("3", "JULY", "2026-07-30", 42000)],
+  4: [cardRow("4", "JUNE", "2026-06-30", 42000)],
+};
+fetchCalls = [];
+fetchImpl = async (url, init) => {
+  const body = JSON.parse(init.body);
+  fetchCalls.push({ url, headers: init.headers, body });
+  const page = body.data.pagination.pageNumber;
+  return respond(cardTxResponse(cardHistory[page] || [], page < 4));
+};
+const cardResult = await engine.fetchRange({ account: card, from: "2026-08-01", to: "2026-08-31" });
+check("every page the bank offers is read", fetchCalls.map((c) => c.body.data.pagination.pageNumber), [1, 2, 3, 4]);
+check("the selected dates are ignored: everything is kept", cardResult.transactions.length, 7);
+check(
+  "oldest first",
+  cardResult.transactions.map((t) => t.date),
+  ["2026-06-30", "2026-07-30", "2026-08-24", "2026-08-30", "2026-09-01", "2026-09-06", "2026-09-12"]
+);
+check("card call goes to the captured endpoint", fetchCalls[0].url, cardTxUrl);
+ok("a single window, no weekly chunks", cardResult.windows === 1, String(cardResult.windows));
+ok("the range does not count against the export", cardResult.rangeApplied === true);
+ok("reports it has no date filter", cardResult.dateFilter === "none");
+ok("not truncated", cardResult.truncated === false);
+ok("every request carried this card's token", fetchCalls.every((c) => c.body.data.card.number.enc === "ENC-TOKEN-1234"));
+ok("the captured card headers were replayed", fetchCalls[0].headers.authorization === "Bearer live-token");
+check("card stamped on each row", [...new Set(cardResult.transactions.map((t) => t.account))], ["************1234"]);
+check("signs flipped in the export", cardResult.transactions.slice(2, 4).map((t) => t.amount), [83007, -25893]);
+check("reports the span the bank actually holds", cardResult.covered, { from: "2026-06-30", to: "2026-09-12" });
+
+fetchCalls = [];
+fetchImpl = async (url, init) => {
+  const body = JSON.parse(init.body);
+  fetchCalls.push(body.data.pagination.pageNumber);
+  return respond(cardTxResponse(cardHistory[1], false));
+};
+const cardLastPage = await engine.fetchRange({ account: card, from: "2026-09-01", to: "2026-09-30" });
+check("hasMoreRecords false ends the walk", fetchCalls, [1]);
+check("kept every september row, pending included", cardLastPage.transactions.length, 3);
+
+// The service promised more pages and then failed: that is a hole in the
+// ledger, not the end of it.
+fetchCalls = [];
+fetchImpl = async (url, init) => {
+  const body = JSON.parse(init.body);
+  const page = body.data.pagination.pageNumber;
+  fetchCalls.push(page);
+  if (page === 2) {
+    return {
+      ok: false,
+      status: 500,
+      text: async () => '{"message":"Por el momento no podemos continuar con tu solicitud"}',
+    };
+  }
+  return respond(cardTxResponse(cardHistory[page], true));
+};
+const cardFailure = await engine.fetchRange({ account: card, from: "2026-08-01", to: "2026-09-30" });
+ok("a failure on a promised page is reported as partial", cardFailure.truncated === true);
+check("no date halving on a service without dates", fetchCalls, [1, 2]);
+
+// Without a captured card call the request is rebuilt from the card list.
+engine.state.templates = { deposit: template };
+fetchCalls = [];
+fetchImpl = async (url, init) => {
+  fetchCalls.push({ url, body: JSON.parse(init.body) });
+  return respond(cardTxResponse(cardHistory[1], false));
+};
+await engine.fetchRange({ account: card, from: "2026-09-01", to: "2026-09-30" });
+check("card endpoint rebuilt from the card list", fetchCalls[0].url, cardTxUrl);
+check("rebuilt body carries the token", fetchCalls[0].body.data.card.number.enc, "ENC-TOKEN-1234");
+ok("the deposit template was not used for the card", fetchCalls[0].body.account === undefined);
+
+// Deposits are untouched by all of the above: still weekly windows, still
+// refusing a template with no dates.
+engine.state.templates = { deposit: dateless };
+fetchCalls = [];
+let stillRefused = "";
+try {
+  await engine.fetchRange({ account, from: "2026-07-01", to: "2026-07-31" });
+} catch (error) {
+  stillRefused = error.message;
+}
+ok("a dateless deposit template is still refused", /open movimientos/i.test(stillRefused), stillRefused);
+engine.state.templates = { deposit: template };
 
 // 9. export ------------------------------------------------------------------
 console.log("\nexport");
@@ -873,6 +1157,9 @@ ok("never leaks a token", !reportText.includes("live-token") && !reportText.incl
 ok("never leaks a balance", !reportText.includes("1000000"));
 ok("never leaks an account number", !reportText.includes("00000000000"));
 ok("never leaks a description", !reportText.includes("PAGO NEQUI") && !reportText.includes("NOMINA"));
+ok("never leaks a card token", !reportText.includes("ENC-TOKEN") && !reportText.includes("1234"));
+ok("says which kinds of product it saw", JSON.stringify(report.accountKinds).includes("card"));
+ok("lists templates per kind", "deposit" in report.templatesCaptured);
 
 console.log(failures ? `\n${failures} failing check(s)\n` : "\nAll checks passed\n");
 process.exit(failures ? 1 : 0);

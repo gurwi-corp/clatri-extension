@@ -30,7 +30,11 @@
     authUrl: null,
     accounts: [],
     accountsUrl: null,
-    template: null,
+    accountsByUrl: {},
+    // One replay template per kind of product. The adapter says which kind a
+    // captured call belongs to, since a deposit body must never be replayed
+    // for a credit card or the other way round.
+    templates: {},
     seen: 0,
     log: [],
     samples: [],
@@ -134,9 +138,8 @@
    * the names that endpoint would not consider foreign.
    */
   function pickHeaders(targetUrl) {
-    if (state.template && state.template.url === targetUrl && state.template.headers) {
-      return state.template.headers;
-    }
+    const own = templateAt(targetUrl);
+    if (own && own.headers) return own.headers;
     if (state.headersByUrl[targetUrl]) return state.headersByUrl[targetUrl];
 
     let best = null;
@@ -158,6 +161,55 @@
       if (common.has(name) || name === "authorization") trimmed[name] = value;
     }
     return trimmed;
+  }
+
+  // --- templates and profiles -----------------------------------------------
+
+  const kindOf = (account) => (bank.kindOf ? bank.kindOf(account) : "default") || "default";
+
+  const kindOfRequest = (url, body) =>
+    (bank.kindOfRequest ? bank.kindOfRequest({ url, body }) : "default") || "default";
+
+  /** The captured transactions call to replay for this account, if any. */
+  function templateFor(account) {
+    return state.templates[kindOf(account)] || null;
+  }
+
+  function templateAt(url) {
+    return Object.values(state.templates).find((entry) => entry && entry.url === url) || null;
+  }
+
+  /**
+   * How to walk this account. Adapter-wide settings apply unless the adapter
+   * overrides them for a kind of product, as Bancolombia does for cards.
+   */
+  function profileFor(account) {
+    const overrides = bank.profileFor ? bank.profileFor(account) || {} : {};
+    return {
+      supportsPagination: bank.supportsPagination,
+      maxPages: bank.maxPages,
+      pageSizeHint: bank.pageSizeHint,
+      maxWindowDays: bank.maxWindowDays,
+      requireRangeApplied: bank.requireRangeApplied,
+      // "bank": the dates go into the request. "none": the service cannot be
+      // queried by date at all, so every page it offers is fetched and the
+      // selected range is ignored.
+      dateFilter: "bank",
+      // Whether a generic gateway error after a short page may be read as the
+      // end of the list. A service that announces its last page itself should
+      // not get that benefit of the doubt.
+      errorAfterRowsIsEnd: true,
+      ...overrides,
+    };
+  }
+
+  /** Every account seen so far, one entry per number, in the order found. */
+  function mergeAccounts() {
+    const byNumber = new Map();
+    for (const list of Object.values(state.accountsByUrl)) {
+      for (const account of list) byNumber.set(account.number, account);
+    }
+    return [...byNumber.values()];
   }
 
   // --- response mining ------------------------------------------------------
@@ -184,11 +236,14 @@
       transactions = bank.parseTransactions(json) || [];
     } catch {}
     try {
-      accounts = transactions.length ? [] : bank.parseAccounts(json) || [];
+      accounts = transactions.length ? [] : bank.parseAccounts(json, url) || [];
     } catch {}
 
+    // Deposit accounts and credit cards arrive from different calls. Each call
+    // replaces its own earlier list, and the panel shows the union.
     if (accounts.length) {
-      state.accounts = accounts;
+      state.accountsByUrl[url] = accounts;
+      state.accounts = mergeAccounts();
       state.accountsUrl = url;
       changed = true;
     }
@@ -197,12 +252,14 @@
       try {
         const body = JSON.parse(requestBody);
         if (body && typeof body === "object") {
+          const kind = kindOfRequest(url, body);
           const score = templateScore(body);
-          if (!state.template || score >= state.template.score) {
+          const current = state.templates[kind];
+          if (!current || score >= current.score) {
             // Keep this request's own headers. Endpoints here do not share a
             // single header set: replaying another call's headers, such as the
             // `filter_list` one, gets the request rejected.
-            state.template = { url, body, method: method || "POST", score, headers };
+            state.templates[kind] = { url, body, method: method || "POST", score, headers };
             changed = true;
           }
         }
@@ -420,8 +477,8 @@
    * one comes back empty or repeats what we already have.
    */
   /** Walk the pages of a single date window, appending into `collected`. */
-  async function fetchWindow({ account, from, to, seen, collected, budget, onProgress }) {
-    const maxPages = bank.supportsPagination ? bank.maxPages || 40 : 1;
+  async function fetchWindow({ account, profile, from, to, seen, collected, budget, onProgress }) {
+    const maxPages = profile.supportsPagination ? profile.maxPages || 40 : 1;
     // Separate from the run-wide `seen`. Windows overlap, so a page full of rows
     // another window already collected is still new to this one, and treating it
     // as "nothing new" would end the walk before the window was covered.
@@ -447,7 +504,7 @@
         from,
         to,
         page,
-        template: state.template,
+        template: templateFor(account),
         referenceUrl: state.accountsUrl || state.authUrl,
       });
       rangeApplied = request.rangeApplied !== false;
@@ -464,9 +521,10 @@
         // failure. It is safe to accept after a non-full successful page; a
         // full page is still split because it may have hit the real row cap.
         const belowPageCap =
-          rowCount > 0 && (!bank.pageSizeHint || rowCount < bank.pageSizeHint);
+          rowCount > 0 && (!profile.pageSizeHint || rowCount < profile.pageSizeHint);
         if (
           belowPageCap &&
+          profile.errorAfterRowsIsEnd !== false &&
           bank.isEndOfWindowError &&
           bank.isEndOfWindowError(error.status, error.message)
         ) {
@@ -558,6 +616,8 @@
     }
 
     state.lastRange = [from, to];
+    const profile = profileFor(account);
+    const noDates = profile.dateFilter === "none";
     const collected = [];
     const seen = new Set();
     const budget = { spent: 0, limit: 120 };
@@ -576,10 +636,10 @@
       from,
       to,
       page: 1,
-      template: state.template,
+      template: templateFor(account),
       referenceUrl: state.accountsUrl || state.authUrl,
     });
-    if (bank.requireRangeApplied && probe.rangeApplied === false) {
+    if (profile.requireRangeApplied && !noDates && probe.rangeApplied === false) {
       throw new Error(
         "Clatri could not apply the selected dates to the bank request. Open Movimientos, " +
           "set Desde and Hasta there, press search once, then retry."
@@ -596,6 +656,7 @@
       windows += 1;
       const result = await fetchWindow({
         account,
+        profile,
         from: windowFrom,
         to: windowTo,
         seen,
@@ -617,7 +678,10 @@
       if (!result.stoppedBy) return;
 
       // Splitting only helps when the dates in the request are ours to set.
-      const halves = depth < MAX_SPLIT_DEPTH && rangeApplied ? shape.halve(windowFrom, windowTo) : null;
+      const halves =
+        depth < MAX_SPLIT_DEPTH && rangeApplied && !noDates
+          ? shape.halve(windowFrom, windowTo)
+          : null;
       if (!halves) {
         truncated = true;
         stoppedBy = result.stoppedBy;
@@ -629,14 +693,20 @@
     // Bancolombia can silently cap a wide query and return a normal-looking
     // final page. Smaller windows avoid relying on an HTTP error to discover
     // that cap. Other adapters can opt in with their own maximum.
-    const initialWindows = chunkRange(from, to, bank.maxWindowDays);
+    const initialWindows = chunkRange(from, to, noDates ? 0 : profile.maxWindowDays);
     for (const [windowFrom, windowTo] of initialWindows) {
       await walk(windowFrom, windowTo, 0);
     }
 
+    // A service with no date filter cannot honour a range, so the dates are
+    // not a promise here: everything the bank offers is what the user asked for.
+    if (noDates && !truncated) rangeApplied = true;
+
     // Always enforce the selected range locally as a final defensive boundary,
     // even when the request builder reports that the dates were applied.
-    const inRange = collected.filter((row) => row.date >= from && row.date <= to);
+    const inRange = noDates
+      ? [...collected]
+      : collected.filter((row) => row.date >= from && row.date <= to);
 
     // Oldest first. A statement reads forwards in time, and any ledger it is
     // imported into expects to replay the movements in the order they happened.
@@ -655,6 +725,7 @@
       covered,
       requested: { from, to },
       rangeApplied,
+      dateFilter: profile.dateFilter,
       truncated,
       stoppedBy,
       windowResults,
@@ -662,6 +733,7 @@
     return {
       transactions: inRange,
       rangeApplied,
+      dateFilter: profile.dateFilter,
       fetched: collected.length,
       windows,
       pages,
@@ -676,6 +748,8 @@
     state,
     bank,
     fetchRange,
+    templateFor,
+    profileFor,
     ready: () => Boolean(state.headers),
     onUpdate(listener) {
       listeners.add(listener);
@@ -687,7 +761,7 @@
   NS.debug = () => {
     console.log("[clatri] session:", state.headers ? "captured" : "not captured", state.authUrl || "");
     console.log("[clatri] accounts:", state.accounts);
-    console.log("[clatri] transactions template:", state.template);
+    console.log("[clatri] transactions templates:", state.templates);
     console.table(state.log);
     return state;
   };
@@ -698,9 +772,8 @@
    */
   /** Which observed call's headers we would borrow to reach `targetUrl`. */
   function headerSourceFor(targetUrl) {
-    if (state.template && state.template.url === targetUrl && state.template.headers) {
-      return "the captured transactions request";
-    }
+    const own = templateAt(targetUrl);
+    if (own && own.headers) return "the captured transactions request";
     if (state.headersByUrl[targetUrl]) return shortUrl(targetUrl);
 
     let best = null;
@@ -726,10 +799,11 @@
         from,
         to,
         page: 1,
-        template: state.template,
+        template: templateFor(account),
         referenceUrl: state.accountsUrl || state.authUrl,
       });
       return {
+        kind: kindOf(account),
         url: shortUrl(request.url),
         method: request.method,
         rangeApplied: request.rangeApplied,
@@ -751,9 +825,13 @@
         sessionCaptured: Boolean(state.headers),
         headerNames: state.headers ? Object.keys(state.headers).sort() : [],
         accountsDetected: state.accounts.length,
-        templateCaptured: Boolean(state.template),
-        templateUrl: state.template ? shortUrl(state.template.url) : null,
-        templateShape: state.template ? outline(state.template.body) : null,
+        accountKinds: state.accounts.map(kindOf),
+        templatesCaptured: Object.fromEntries(
+          Object.entries(state.templates).map(([kind, entry]) => [
+            kind,
+            { url: shortUrl(entry.url), shape: outline(entry.body) },
+          ])
+        ),
         requestsSeen: state.seen,
         headerSetsByEndpoint: Object.keys(state.headersByUrl).map(shortUrl),
         wouldCall: describePlannedCall(),

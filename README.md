@@ -58,10 +58,11 @@ Chromium browsers.
 1. Sign in to your bank the way you normally do
 2. A small **Clatri** pill appears in the bottom right. Its dot turns green once
    your session is detected
-3. Click it, pick an account and a date range, press **Download CSV**
+3. Click it, pick an account or credit card and a date range, press
+   **Download CSV**
 
-That is the whole thing. `JSON` and `Copy` give you the same result in another
-form without asking the bank again.
+That is the whole thing. The format picker switches the file to JSON, and the
+copy icon next to the button puts the same rows on the clipboard instead.
 
 It works from anywhere in the portal, including the home screen. Opening the
 account's transactions tab first is slightly better, because the extension can
@@ -69,9 +70,9 @@ then copy the exact request your bank just made instead of rebuilding one.
 
 ## Supported banks
 
-| Country | Bank | Accounts | Transactions |
-|---|---|:--:|:--:|
-| 🇨🇴 Colombia | Bancolombia | ✅ | ✅ |
+| Country | Bank | Accounts | Credit cards | Transactions |
+|---|---|:--:|:--:|:--:|
+| 🇨🇴 Colombia | Bancolombia | ✅ | ✅ | ✅ |
 
 The country and bank pickers are already in the interface, waiting. Yours could
 be the next row.
@@ -179,7 +180,7 @@ anything financial.
 ## What is next
 
 - More banks and more countries, starting wherever contributors are
-- Credit cards and savings pockets, not just accounts
+- Savings pockets, not just accounts and credit cards
 - Sending transactions **straight into Clatri**, so the CSV round trip becomes
   optional
 
@@ -190,6 +191,14 @@ and `CREDITO` do not line up with the sign of the amount in an obvious way, so
 `direction` is derived from the sign, where negative is money going out, and the
 bank's own label is preserved beside it. Check a few rows against your statement
 before importing in bulk.
+
+Credit cards follow the same rule. Bancolombia reports a purchase as a positive
+amount and a payment to the card as a negative one, so those are flipped: a
+purchase is an `outflow`, an *abono* an `inflow`. Movements the bank has not
+posted yet are included, marked `PENDIENTE` in `bank_type`, and can still
+change. The card service cannot be queried by date, so when a card is selected
+the date fields lock and Clatri downloads every movement the bank offers; the
+file is named after the dates it actually contains.
 
 Automating a bank site is not something banks endorse, even when all you do is
 repeat a request your own session already made from your own browser. It is

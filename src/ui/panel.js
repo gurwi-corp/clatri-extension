@@ -23,17 +23,16 @@
     countryCode: countries[0].code,
     bankId: engine?.bank?.id || registry.forCountry(countries[0].code)[0]?.id || null,
     accountNumber: "",
-    manualAccount: "",
-    useManual: false,
-    manualDecided: false,
     showDiagnostics: false,
     from: firstOfMonth(),
     to: today(),
     busy: false,
     message: "",
     tone: "neutral",
+    format: "csv",
     results: null,
     resultsContext: null,
+    resultsKey: null,
   };
 
   root.innerHTML = `
@@ -96,13 +95,47 @@
 
       .label { display: block; font-size: 10.5px; font-weight: 600; color: #8a8f95; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .045em; }
 
-      select, input[type="date"], input[type="text"] {
+      input[type="date"], input[type="text"] {
         width: 100%; height: 35px; padding: 0 10px;
         border: 1px solid rgba(0,0,0,.13); border-radius: 9px;
         background: #fafafb; color: #1a1a1a; font-size: 13px; outline: none; appearance: none;
       }
-      select:focus, input:focus { border-color: rgba(0,0,0,.32); background: #fff; }
-      select:disabled, input:disabled { color: #a2a7ac; cursor: not-allowed; }
+      input:focus { border-color: rgba(0,0,0,.32); background: #fff; }
+      input:disabled { color: #a2a7ac; cursor: not-allowed; }
+
+      /* Our own dropdown. The browser's select cannot be styled inside the
+         shadow root, and with its arrow hidden it read as a text box. */
+      .picker { position: relative; width: 100%; }
+      .picker[hidden] { display: none; }
+      .picker-btn {
+        display: flex; align-items: center; gap: 8px; width: 100%; height: 35px;
+        padding: 0 10px; border: 1px solid rgba(0,0,0,.13); border-radius: 9px;
+        background: #fafafb; color: #1a1a1a; font-size: 13px; text-align: left; cursor: pointer;
+      }
+      .picker-btn .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .picker-btn svg { flex: none; color: #797e84; transition: transform .14s ease; }
+      .picker-btn:hover:not(:disabled) { background: #f2f3f4; }
+      .picker-btn:focus-visible { outline: none; border-color: rgba(0,0,0,.32); background: #fff; }
+      .picker-btn:disabled { color: #a2a7ac; cursor: not-allowed; }
+      .picker-btn:disabled svg { opacity: .4; }
+      .picker[aria-expanded="true"] .picker-btn { border-color: rgba(0,0,0,.32); background: #fff; }
+      .picker[aria-expanded="true"] .picker-btn svg { transform: rotate(180deg); }
+      .picker-menu {
+        position: absolute; left: 0; right: 0; top: calc(100% + 5px); z-index: 5;
+        background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.14);
+        padding: 4px; max-height: 214px; overflow-y: auto;
+      }
+      .picker-menu[hidden] { display: none; }
+      .picker-option {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        padding: 8px 9px; border-radius: 7px; font-size: 12.5px; line-height: 1.3;
+        color: #1a1a1a; cursor: pointer;
+      }
+      .picker-option .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .picker-option:hover, .picker-option.active { background: #f2f3f4; }
+      .picker-option[aria-selected="true"] { font-weight: 600; }
+      .picker-option[aria-selected="true"]::after { content: "\\2713"; flex: none; font-size: 11px; color: #17803d; }
 
       .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -117,8 +150,10 @@
         border: 1px solid rgba(0,0,0,.11); background: #fff; color: #45494e;
         border-radius: 999px; height: 27px; padding: 0 11px; font-size: 11.5px; cursor: pointer;
       }
-      .chip:hover { background: #f2f3f4; color: #1a1a1a; }
+      .chip:hover:not(:disabled) { background: #f2f3f4; color: #1a1a1a; }
       .chip[aria-pressed="true"] { background: #1a1a1a; border-color: #1a1a1a; color: #fff; }
+      .chip:disabled { color: #b6babe; cursor: not-allowed; }
+      .chip:disabled[aria-pressed="true"] { background: #dcdee1; border-color: #dcdee1; color: #fff; }
 
       .primary {
         width: 100%; height: 39px; border: 0; border-radius: 10px;
@@ -127,9 +162,16 @@
       .primary:hover { background: #303030; }
       .primary:disabled { background: #dcdee1; color: #fff; cursor: not-allowed; }
 
-      .secondary { display: flex; gap: 8px; }
+      .actions { display: flex; gap: 8px; }
+      .actions .primary { flex: 1; }
+      .icon {
+        flex: none; width: 39px; height: 39px; border: 1px solid rgba(0,0,0,.11); border-radius: 10px;
+        background: #fff; color: #45494e; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      }
+      .icon:hover:not(:disabled) { background: #f2f3f4; color: #1a1a1a; }
+      .icon:disabled { color: #b6babe; cursor: not-allowed; }
       .ghost {
-        flex: 1; height: 33px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px;
+        width: 100%; height: 33px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px;
         background: #fff; color: #45494e; font-size: 12px; cursor: pointer;
       }
       .ghost:hover:not(:disabled) { background: #f2f3f4; color: #1a1a1a; }
@@ -157,15 +199,29 @@
         .launcher, .panel { background: #1b1c1e; color: #f2f3f4; border-color: rgba(255,255,255,.11); }
         header { border-bottom-color: rgba(255,255,255,.08); }
         .sub, .label, .msg, .link { color: #9aa0a6; }
-        select, input[type="date"], input[type="text"] { background: #232426; color: #f2f3f4; border-color: rgba(255,255,255,.13); }
+        input[type="date"], input[type="text"] { background: #232426; color: #f2f3f4; border-color: rgba(255,255,255,.13); }
+        .picker-btn { background: #232426; color: #f2f3f4; border-color: rgba(255,255,255,.13); }
+        .picker-btn svg { color: #9aa0a6; }
+        .picker-btn:hover:not(:disabled) { background: #2c2d30; }
+        .picker-btn:focus-visible, .picker[aria-expanded="true"] .picker-btn { background: #2a2b2e; border-color: rgba(255,255,255,.32); }
+        .picker-btn:disabled { color: #7d8288; }
+        .picker-menu { background: #232426; border-color: rgba(255,255,255,.12); box-shadow: 0 12px 28px rgba(0,0,0,.5); }
+        .picker-option { color: #f2f3f4; }
+        .picker-option:hover, .picker-option.active { background: #2c2d30; }
+        .picker-option[aria-selected="true"]::after { color: #5fd08a; }
         input[type="date"]::-webkit-calendar-picker-indicator {
           filter: invert(1); opacity: .9; cursor: pointer;
         }
-        select:focus, input:focus { background: #2a2b2e; border-color: rgba(255,255,255,.32); }
+        input:focus { background: #2a2b2e; border-color: rgba(255,255,255,.32); }
+        input:disabled { color: #7d8288; }
+        input:disabled::-webkit-calendar-picker-indicator { opacity: .35; cursor: not-allowed; }
         .status, .diag-list { background: #232426; color: #b6babe; }
-        .chip, .ghost { background: #232426; color: #d5d7da; border-color: rgba(255,255,255,.13); }
-        .chip:hover, .ghost:hover:not(:disabled) { background: #2c2d30; color: #fff; }
+        .chip, .ghost, .icon { background: #232426; color: #d5d7da; border-color: rgba(255,255,255,.13); }
+        .chip:hover:not(:disabled), .ghost:hover:not(:disabled), .icon:hover:not(:disabled) { background: #2c2d30; color: #fff; }
+        .icon:disabled { color: #5f6469; }
         .chip[aria-pressed="true"] { background: #f2f3f4; border-color: #f2f3f4; color: #17181a; }
+        .chip:disabled { color: #5f6469; }
+        .chip:disabled[aria-pressed="true"] { background: #3a3b3e; border-color: #3a3b3e; color: #7d8288; }
         .primary { background: #f2f3f4; color: #17181a; }
         .primary:hover { background: #fff; }
         .primary:disabled { background: #3a3b3e; color: #7d8288; }
@@ -192,23 +248,19 @@
           <div class="row">
             <div>
               <span class="label">Country</span>
-              <select id="country"></select>
+              <div class="picker" id="country" aria-expanded="false"></div>
             </div>
             <div>
               <span class="label">Bank</span>
-              <select id="bank"></select>
+              <div class="picker" id="bank" aria-expanded="false"></div>
             </div>
           </div>
 
           <div class="status"><span class="dot" id="dot"></span><span class="text" id="status"></span></div>
 
           <div>
-            <span class="label">Account</span>
-            <select id="account"></select>
-            <input id="accountManual" type="text" placeholder="e.g. 00000000000" hidden />
-            <p class="msg" id="accountHint" hidden>Clatri could not read your account list. Type the
-              number as your bank shows it, digits only, no dashes or spaces.</p>
-            <div style="margin-top:7px"><button class="link" id="toggleManual"></button></div>
+            <span class="label" id="accountLabel">Account</span>
+            <div class="picker" id="account" aria-expanded="false"></div>
           </div>
 
           <div class="row">
@@ -222,6 +274,9 @@
             </div>
           </div>
 
+          <p class="msg" id="rangeNote" hidden>The bank does not filter this card's movements by
+            date. Clatri downloads everything it offers.</p>
+
           <div class="presets">
             <button class="chip" data-preset="this-month">This month</button>
             <button class="chip" data-preset="last-month">Last month</button>
@@ -229,10 +284,19 @@
             <button class="chip" data-preset="this-year">This year</button>
           </div>
 
-          <button class="primary" id="run">Download CSV</button>
-          <div class="secondary">
-            <button class="ghost" id="json" disabled>JSON</button>
-            <button class="ghost" id="copy" disabled>Copy</button>
+          <div>
+            <span class="label">Format</span>
+            <div class="picker" id="format" aria-expanded="false"></div>
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="run">Download CSV</button>
+            <button class="icon" id="copy" title="Copy to clipboard" aria-label="Copy to clipboard">
+              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5.5" y="5.5" width="8" height="8" rx="1.8"/>
+                <path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>
+              </svg>
+            </button>
           </div>
 
           <p class="msg" id="msg"></p>
@@ -286,19 +350,18 @@
 
   function selectedAccount() {
     const accounts = engine?.state.accounts || [];
-    if (ui.useManual) {
-      const number = ui.manualAccount.trim();
-      if (!number) return null;
-      return (
-        accounts.find((account) => account.number === number) || {
-          number,
-          type: "",
-          currency: currentBank()?.currency || "",
-          name: "",
-        }
-      );
-    }
     return accounts.find((account) => account.number === ui.accountNumber) || null;
+  }
+
+  /** Whether the bank lets this product be queried by date at all. */
+  function datesLocked(account) {
+    if (!account || !engine?.profileFor) return false;
+    return engine.profileFor(account).dateFilter === "none";
+  }
+
+  /** A masked card number reads better as ****0056 than as a wall of stars. */
+  function displayNumber(number) {
+    return String(number || "").replace(/\*{4,}/, "****");
   }
 
   function formatAmount(value, currency) {
@@ -315,14 +378,122 @@
 
   // --- rendering ------------------------------------------------------------
 
-  function fillSelect(node, items, value) {
-    node.innerHTML = items
-      .map(
-        (item) =>
-          `<option value="${escapeHtml(item.value)}"${item.value === value ? " selected" : ""}>` +
-          `${escapeHtml(item.label)}</option>`
-      )
-      .join("");
+  const CHEVRON =
+    '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
+    '<path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  /**
+   * Render a picker. It behaves like a select from the outside: `node.value`
+   * holds the choice and a "change" event fires when the user picks another.
+   */
+  function fillSelect(node, items, value, { placeholder = "" } = {}) {
+    const chosen = items.find((item) => item.value === value) || items[0] || null;
+    node.value = chosen ? chosen.value : "";
+    node.disabled = !items.length;
+    node.setAttribute("aria-expanded", "false");
+    node.innerHTML =
+      `<button type="button" class="picker-btn"${items.length ? "" : " disabled"}>` +
+      `<span class="text">${escapeHtml(chosen ? chosen.label : placeholder)}</span>${CHEVRON}</button>` +
+      `<div class="picker-menu" role="listbox" hidden>` +
+      items
+        .map(
+          (item) =>
+            `<div class="picker-option" role="option" data-value="${escapeHtml(item.value)}" ` +
+            `aria-selected="${item.value === node.value}"><span class="text">${escapeHtml(item.label)}</span></div>`
+        )
+        .join("") +
+      `</div>`;
+  }
+
+  const pickers = [];
+
+  function setPickerOpen(node, open) {
+    const menu = node.querySelector(".picker-menu");
+    if (!menu) return;
+    if (open && node.disabled) return;
+    if (open) pickers.forEach((other) => other !== node && setPickerOpen(other, false));
+    menu.hidden = !open;
+    node.setAttribute("aria-expanded", String(open));
+    if (!open) {
+      node.querySelectorAll(".picker-option.active").forEach((option) => option.classList.remove("active"));
+    }
+  }
+
+  const pickerIsOpen = (node) => node.getAttribute("aria-expanded") === "true";
+
+  /** Clicks and keys for one picker, wired once; the markup inside is rerendered freely. */
+  function wirePicker(node) {
+    pickers.push(node);
+
+    const options = () => Array.from(node.querySelectorAll(".picker-option"));
+    const choose = (value) => {
+      setPickerOpen(node, false);
+      if (value === undefined || value === node.value) return;
+      node.value = value;
+      // Show the choice at once, before whoever listens gets to rerender.
+      options().forEach((option) => {
+        option.setAttribute("aria-selected", String(option.dataset.value === value));
+        if (option.dataset.value === value) {
+          const text = node.querySelector(".picker-btn .text");
+          if (text) text.textContent = option.textContent;
+        }
+      });
+      node.dispatchEvent(new Event("change"));
+    };
+    const activeIndex = () => options().findIndex((option) => option.classList.contains("active"));
+    const highlight = (index) => {
+      const list = options();
+      if (!list.length) return;
+      const next = (index + list.length) % list.length;
+      list.forEach((option, at) => option.classList.toggle("active", at === next));
+      if (list[next].scrollIntoView) list[next].scrollIntoView({ block: "nearest" });
+    };
+
+    node.addEventListener("click", (event) => {
+      const target = event.target;
+      const option = target && target.closest ? target.closest(".picker-option") : null;
+      if (option) {
+        choose(option.dataset.value);
+        return;
+      }
+      if (target && target.closest && target.closest(".picker-btn")) {
+        setPickerOpen(node, !pickerIsOpen(node));
+      }
+    });
+
+    node.addEventListener("keydown", (event) => {
+      const open = pickerIsOpen(node);
+      if (event.key === "Escape" || event.key === "Tab") {
+        if (open) setPickerOpen(node, false);
+        return;
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        if (!open) {
+          setPickerOpen(node, true);
+          const current = options().findIndex((option) => option.dataset.value === node.value);
+          highlight(current === -1 ? 0 : current);
+          return;
+        }
+        highlight(activeIndex() + (event.key === "ArrowDown" ? 1 : -1));
+        return;
+      }
+      if ((event.key === "Enter" || event.key === " ") && open) {
+        event.preventDefault();
+        const list = options();
+        const at = activeIndex();
+        choose(at === -1 ? undefined : list[at].dataset.value);
+      }
+    });
+  }
+
+  /** A click anywhere else closes whichever picker is open. */
+  function closePickersOutside(event) {
+    const path = event.composedPath ? event.composedPath() : [];
+    pickers.forEach((node) => {
+      if (pickerIsOpen(node) && !path.includes(node)) setPickerOpen(node, false);
+    });
   }
 
   function escapeHtml(value) {
@@ -362,41 +533,28 @@
     const accounts = engine?.state.accounts || [];
     const live = sessionReady();
 
-    // A live session with no readable account list used to leave the download
-    // button greyed out with no way forward. Fall back to typing the number.
-    if (live && !accounts.length && !ui.manualDecided) ui.useManual = true;
+    // Products show up one call at a time: the savings list first, the cards
+    // once the portal asks for them. Say how many are in the list right now.
+    el("accountLabel").textContent = accounts.length
+      ? `Account · ${accounts.length} detected`
+      : "Account";
 
-    const accountSelect = el("account");
-    accountSelect.hidden = ui.useManual;
-    el("accountManual").hidden = !ui.useManual;
-    el("accountHint").hidden = !(ui.useManual && !accounts.length);
-    el("toggleManual").textContent = ui.useManual
-      ? "Pick from detected accounts"
-      : "Enter account number manually";
-
-    if (!ui.useManual) {
-      if (accounts.length) {
-        if (!accounts.some((account) => account.number === ui.accountNumber)) {
-          ui.accountNumber = accounts[0].number;
-        }
-        fillSelect(
-          accountSelect,
-          accounts.map((account) => ({
-            value: account.number,
-            label:
-              `${account.typeLabel || "Account"} ${account.number}` +
-              (account.balance === null || account.balance === undefined
-                ? ""
-                : ` · ${formatAmount(account.balance, account.currency)}`),
-          })),
-          ui.accountNumber
-        );
-        accountSelect.disabled = false;
-      } else {
-        accountSelect.innerHTML = "<option>No accounts detected yet</option>";
-        accountSelect.disabled = true;
-      }
+    if (accounts.length && !accounts.some((account) => account.number === ui.accountNumber)) {
+      ui.accountNumber = accounts[0].number;
     }
+    fillSelect(
+      el("account"),
+      accounts.map((account) => ({
+        value: account.number,
+        label:
+          `${account.typeLabel || "Account"} ${displayNumber(account.number)}` +
+          (account.balance === null || account.balance === undefined
+            ? ""
+            : ` · ${formatAmount(account.balance, account.currency)}`),
+      })),
+      ui.accountNumber,
+      { placeholder: "No accounts detected yet" }
+    );
 
     el("dot").classList.toggle("live", live);
     el("launcherDot").classList.toggle("live", live);
@@ -405,9 +563,10 @@
     if (!bankIsHere()) {
       el("status").textContent = `Open ${bank ? bank.name : "the bank"} to export from it`;
     } else if (live) {
-      const exact = Boolean(engine?.state.template);
+      const chosen = selectedAccount();
+      const exact = Boolean(chosen && engine?.templateFor && engine.templateFor(chosen));
       el("status").textContent = !accounts.length
-        ? "Session detected · type your account number below"
+        ? "Session detected · open Tus productos so Clatri can list your accounts"
         : exact
           ? `Ready · ${accounts.length} account${accounts.length === 1 ? "" : "s"}, exact request copied`
           : `Ready · ${accounts.length} account${accounts.length === 1 ? "" : "s"}, using a rebuilt request`;
@@ -415,20 +574,25 @@
       el("status").textContent = bank?.hint || "Waiting for the bank session";
     }
 
+    // A card cannot be queried by date at this bank. Lock the range so the
+    // dates do not look like they mean something.
+    const locked = datesLocked(selectedAccount());
     el("from").value = ui.from;
     el("to").value = ui.to;
+    el("from").disabled = locked;
+    el("to").disabled = locked;
+    el("rangeNote").hidden = !locked;
     root.querySelectorAll(".chip").forEach((chip) => {
       const [from, to] = presetRange(chip.dataset.preset);
       chip.setAttribute("aria-pressed", String(from === ui.from && to === ui.to));
+      chip.disabled = locked;
     });
 
     const runnable = live && !ui.busy && Boolean(selectedAccount());
+    fillSelect(el("format"), FORMATS.map((entry) => ({ value: entry.id, label: entry.label })), ui.format);
     el("run").disabled = !runnable;
-    el("run").textContent = ui.busy ? "Working…" : "Download CSV";
-
-    const hasResults = Boolean(ui.results && ui.results.length);
-    el("json").disabled = !hasResults || ui.busy;
-    el("copy").disabled = !hasResults || ui.busy;
+    el("run").textContent = ui.busy ? "Working…" : `Download ${formatOf(ui.format).label}`;
+    el("copy").disabled = !runnable;
 
     const message = el("msg");
     message.textContent = ui.message;
@@ -448,10 +612,11 @@
     el("reportBtn").hidden = !ui.showDiagnostics;
     if (!ui.showDiagnostics) return;
 
+    const templates = Object.keys(state?.templates || {});
     const summary = [
       `session ....... ${state?.headers ? "captured" : "not captured"}`,
       `accounts ...... ${state?.accounts?.length || 0}`,
-      `tx template ... ${state?.template ? "captured" : "rebuilt from the accounts call"}`,
+      `tx template ... ${templates.length ? `captured (${templates.join(", ")})` : "rebuilt from the accounts call"}`,
       `header sets ... ${Object.keys(state?.headersByUrl || {}).length} endpoints`,
       "",
     ];
@@ -477,29 +642,66 @@
 
   // --- actions --------------------------------------------------------------
 
-  function contextFor(account) {
+  /** `covered` names the file when the dates were the bank's, not the user's. */
+  function contextFor(account, covered) {
     const bank = currentBank();
     const country = registry.country(ui.countryCode);
+    const span = datesLocked(account) && covered ? covered : { from: ui.from, to: ui.to };
     return {
       bank: bank?.name || "",
       country: country?.name || ui.countryCode,
       account: account.number,
       currency: account.currency || bank?.currency || "",
-      from: ui.from,
-      to: ui.to,
+      from: span.from,
+      to: span.to,
     };
   }
 
-  async function run() {
+  const FORMATS = [
+    { id: "csv", label: "CSV", mime: "text/csv", serialize: (rows, context) => exporter.toCsv(rows, context) },
+    { id: "json", label: "JSON", mime: "application/json", serialize: (rows, context) => exporter.toJson(rows, context) },
+  ];
+  const formatOf = (id) => FORMATS.find((entry) => entry.id === id) || FORMATS[0];
+
+  /** Hand the result over as a file or onto the clipboard, in the chosen format. */
+  async function deliver(mode, transactions, context) {
+    const format = formatOf(ui.format);
+    const text = format.serialize(transactions, context);
+    if (mode === "copy") {
+      await exporter.copy(text);
+      return;
+    }
+    exporter.download(text, exporter.filename(context, format.id), format.mime);
+  }
+
+  const exportKey = (account) => `${account.number}|${ui.from}|${ui.to}`;
+
+  /**
+   * `mode` is "download" or "copy". A download always asks the bank again; a
+   * copy reuses the rows of the last export when nothing has changed since.
+   */
+  async function run(mode = "download") {
     const account = selectedAccount();
     if (!account) return;
-    if (ui.from > ui.to) {
+    const locked = datesLocked(account);
+    if (!locked && ui.from > ui.to) {
       say("The start date is after the end date.", "error");
+      return;
+    }
+
+    if (mode === "copy" && ui.results && ui.resultsKey === exportKey(account)) {
+      try {
+        await deliver("copy", ui.results, ui.resultsContext);
+        say(`${ui.results.length} transactions copied as ${formatOf(ui.format).label}.`, "ok");
+      } catch {
+        say("Could not reach the clipboard.", "error");
+      }
       return;
     }
 
     ui.busy = true;
     ui.results = null;
+    ui.resultsKey = null;
     say("Requesting transactions…");
 
     try {
@@ -507,13 +709,14 @@
         account,
         from: ui.from,
         to: ui.to,
-        onProgress: ({ total, from, to }) =>
-          say(`${total} transactions so far… (${from} to ${to})`),
+        onProgress: ({ total, page, from, to }) =>
+          say(locked ? `${total} transactions so far… (page ${page})` : `${total} transactions so far… (${from} to ${to})`),
       });
 
       ui.busy = false;
       ui.results = truncated ? null : transactions;
-      ui.resultsContext = contextFor(account);
+      ui.resultsContext = contextFor(account, covered);
+      ui.resultsKey = truncated ? null : exportKey(account);
 
       // Without a date filter to rewrite, Clatri only gets the bank's own window.
       const teachRange =
@@ -523,7 +726,7 @@
 
       // A partial ledger is more dangerous than no ledger: importing it looks
       // successful. Keep the recovered count in the message, but do not create
-      // a file or enable the alternate export buttons.
+      // a file or keep the rows around for copying.
       if (truncated) {
         const span = covered ? ` The bank returned rows from ${covered.from} to ${covered.to}.` : "";
         say(
@@ -537,19 +740,22 @@
 
       if (!transactions.length) {
         say(
-          rangeApplied
-            ? "No transactions in that range."
-            : `The bank returned ${fetched} transactions, none inside your dates.${teachRange}`,
+          locked
+            ? "The bank has no movements for this card."
+            : rangeApplied
+              ? "No transactions in that range."
+              : `The bank returned ${fetched} transactions, none inside your dates.${teachRange}`,
           "neutral"
         );
         return;
       }
 
-      exporter.download(
-        exporter.toCsv(transactions, ui.resultsContext),
-        exporter.filename(ui.resultsContext, "csv"),
-        "text/csv"
-      );
+      try {
+        await deliver(mode, transactions, ui.resultsContext);
+      } catch {
+        say("Could not reach the clipboard.", "error");
+        return;
+      }
 
       const split =
         windows > 1
@@ -560,8 +766,9 @@
       // rather than only after opening the file.
       const span = covered ? ` Transaction dates: ${covered.from} to ${covered.to}.` : "";
 
+      const verb = mode === "copy" ? `copied as ${formatOf(ui.format).label}` : "exported";
       say(
-        `${transactions.length} transactions exported.${span}${split}` +
+        `${transactions.length} transactions ${verb}.${span}${split}` +
           `${rangeApplied ? "" : teachRange}`,
         !rangeApplied ? "neutral" : "ok"
       );
@@ -589,6 +796,10 @@
     setOpen(false);
   });
 
+  ["country", "bank", "account", "format"].forEach((id) => wirePicker(el(id)));
+  root.addEventListener("click", closePickersOutside);
+  document.addEventListener("click", closePickersOutside);
+
   el("country").addEventListener("change", (event) => {
     ui.countryCode = event.target.value;
     ui.bankId = registry.forCountry(ui.countryCode)[0]?.id || null;
@@ -603,16 +814,8 @@
 
   el("account").addEventListener("change", (event) => {
     ui.accountNumber = event.target.value;
-  });
-
-  el("accountManual").addEventListener("input", (event) => {
-    ui.manualAccount = event.target.value;
-    el("run").disabled = !(sessionReady() && !ui.busy && Boolean(selectedAccount()));
-  });
-
-  el("toggleManual").addEventListener("click", () => {
-    ui.useManual = !ui.useManual;
-    ui.manualDecided = true;
+    ui.message = "";
+    // A card locks the date fields and reads its own template, so repaint.
     render();
   });
 
@@ -648,26 +851,13 @@
     });
   });
 
-  el("run").addEventListener("click", run);
-
-  el("json").addEventListener("click", () => {
-    if (!ui.results) return;
-    exporter.download(
-      exporter.toJson(ui.results, ui.resultsContext),
-      exporter.filename(ui.resultsContext, "json"),
-      "application/json"
-    );
+  el("format").addEventListener("change", (event) => {
+    ui.format = event.target.value;
+    render();
   });
 
-  el("copy").addEventListener("click", async () => {
-    if (!ui.results) return;
-    try {
-      await exporter.copy(exporter.toCsv(ui.results, ui.resultsContext));
-      say("Copied to the clipboard.", "ok");
-    } catch {
-      say("Could not reach the clipboard.", "error");
-    }
-  });
+  el("run").addEventListener("click", () => run("download"));
+  el("copy").addEventListener("click", () => run("copy"));
 
   if (engine) engine.onUpdate(() => render());
 

@@ -48,7 +48,8 @@ Chrome can record those calls and save them as a file.
 5. Tick **Preserve log** so a page change does not wipe the recording.
 6. Filter by **Fetch/XHR**. You do not need images or CSS.
 7. In the bank, open your accounts (products) and then movements /
-   transactions. Those two calls are the ones that matter.
+   transactions. Those two calls are the ones that matter. If the bank shows
+   credit cards separately, open one of those and its movements too.
 8. Export: click the ↓ download arrow in the Network toolbar (**Export HAR**),
    or right-click the list → **Save all as HAR with content**. Chrome writes a
    `.har` file.
@@ -78,11 +79,25 @@ registry.register({
   matchesHost: (host) => /(^|\.)yourbank\.com$/i.test(host),
   isApiRequest: (url) => /yourbank\.com/i.test(url) && !/\.(js|css|png|svg)(\?|$)/i.test(url),
 
-  parseAccounts,             // response -> [{ number, name, type, currency, balance }]
+  parseAccounts,             // (response, url) -> [{ number, name, type, currency, balance }]
   parseTransactions,         // response -> [{ date, description, amount, reference }]
-  buildTransactionsRequest,  // { account, from, to, page } -> { url, method, body }
+  buildTransactionsRequest,  // { account, from, to, page, template } -> { url, method, body }
 });
 ```
+
+A bank that serves more than one kind of product, such as accounts and credit
+cards, through different calls can add three optional hooks:
+
+```js
+  kindOf: (account) => "deposit" | "card",        // which template an account replays
+  kindOfRequest: ({ url, body }) => "deposit" | "card", // which kind a captured call is
+  profileFor: (account) => ({ dateFilter: "none", maxWindowDays: 0, ... }),
+```
+
+The engine keeps one captured request per kind and walks each account with its
+own profile. `dateFilter: "none"` is for a service that cannot be queried by
+date: the panel locks the date fields and the engine fetches every page the
+bank offers. See the credit card half of `co-bancolombia.js`.
 
 Use the helpers in `src/core/shape.js`. They find lists by what rows look like,
 not by a hardcoded path, and they rewrite dates in whatever layout the bank
