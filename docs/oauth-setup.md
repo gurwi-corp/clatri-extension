@@ -51,8 +51,8 @@ a literal query separator; `*` allows the random attempt identifier. Each host
 belongs to one extension ID. The worker separately verifies the exact origin,
 path, attempt and PKCE code, rejecting fragment tokens and stale callbacks.
 The dev panel shows its own pattern for copying. Do not add a wildcard for all
-`chromiumapp.org` subdomains. These patterns have been documented, not remotely
-applied or tested through a real login.
+`chromiumapp.org` subdomains. The user confirmed adding the return URLs in Supabase on 2026-09-20. The
+agent has not independently verified the allow-list or completed a real login.
 
 ## Google Cloud
 
@@ -106,7 +106,7 @@ that distinction. Storage restriction is not encryption against device malware.
 ## Next implementation stages
 
 The API has initial closed observation contracts, conservative identity helpers,
-and a separate Supabase user-JWT dependency in the Clatri worktree. They are not
+and a separate Supabase user-JWT dependency in the Clatri repository. They are not
 yet exposed as financial import endpoints. Durable jobs, bindings, atomic
 materialization, LLM categorization, historical FX, capture-to-API transport,
 Flutter/web account detail integration and Gurwi Analytics remain pending.
