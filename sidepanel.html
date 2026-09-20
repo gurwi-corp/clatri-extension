@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clatri</title>
+  <link rel="stylesheet" href="src/ui/sidepanel.css">
+</head>
+<body>
+  <header><img src="icons/icon-48.png" width="32" height="32" alt=""><span>Clatri</span><span class="companion">Tu cuenta, a mano</span></header>
+  <main>
+    <section id="loading" aria-live="polite"><p class="muted">Comprobando tu sesión…</p></section>
+    <section id="login" hidden>
+      <div class="eyebrow">BIENVENIDO A CLATRI</div>
+      <h1>Una sola cuenta.<br>También en Chrome.</h1>
+      <p class="intro">Entra con la misma cuenta que usas en <a href="https://clatri.com" target="_blank" rel="noopener noreferrer">Clatri</a>.</p>
+      <div class="providers">
+        <button id="google" class="provider"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.9h11a9.4 9.4 0 0 1-4.1 6.1v5h6.6c3.9-3.6 6.1-8.8 6.1-14.9Z"/><path fill="#34A853" d="M24 44c5.5 0 10.2-1.8 13.5-4.9l-6.6-5c-1.8 1.2-4.1 1.9-6.9 1.9-5.3 0-9.8-3.6-11.4-8.3H5.8v5.2A20.4 20.4 0 0 0 24 44Z"/><path fill="#FBBC05" d="M12.6 27.7a12 12 0 0 1 0-7.4v-5.2H5.8a20 20 0 0 0 0 17.8l6.8-5.2Z"/><path fill="#EA4335" d="M24 12c3 0 5.6 1 7.7 3l5.8-5.8A19.5 19.5 0 0 0 24 4 20.4 20.4 0 0 0 5.8 15.1l6.8 5.2C14.2 15.6 18.7 12 24 12Z"/></svg>Continuar con Google</button>
+        <button id="apple" class="provider apple"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.1 12.4c0-2 1.6-3 1.7-3.1-1-1.5-2.6-1.7-3.1-1.7-1.3-.2-2.5.8-3.1.8-.7 0-1.7-.8-2.8-.7-1.4 0-2.7.8-3.4 2-1.4 2.5-.4 6.2.9 8.2.7 1 1.4 2 2.5 2 1-.1 1.4-.6 2.7-.6 1.2 0 1.6.6 2.8.6 1.2 0 1.9-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.3-.1 0-2.1-.8-2.1-3.2ZM15 6.3c.5-.7.9-1.7.8-2.7-.8 0-1.9.6-2.5 1.3-.6.6-1 1.6-.9 2.5.9.1 2-.5 2.6-1.1Z"/></svg>Continuar con Apple</button>
+      </div>
+      <p class="privacy">Iniciar sesión en Clatri no conecta tu banco ni envía movimientos.</p>
+    </section>
+    <section id="account" hidden>
+      <div class="eyebrow">TU CUENTA CLATRI</div>
+      <h1>Sesión iniciada</h1>
+      <div class="account-card"><span class="connected" aria-hidden="true"></span><div><strong>Conectada a Clatri</strong><p id="email"></p></div></div>
+      <a class="primary" href="https://clatri.com" target="_blank" rel="noreferrer noopener">Abrir Clatri <span aria-hidden="true">↗</span></a>
+      <div class="bank-note"><h2>Tus movimientos bancarios</h2><p>Puedes seguir descargando el CSV desde el panel de Clatri en Bancolombia. La importación directa todavía no está habilitada.</p></div>
+      <button id="logout" class="text-button">Cerrar sesión en esta extensión</button>
+    </section>
+    <section id="mfa" hidden>
+      <div class="eyebrow">VERIFICACIÓN EN DOS PASOS</div><h1>Confirma que eres tú</h1>
+      <form id="mfa-form"><label for="code">Código de tu aplicación de autenticación</label><input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required><button class="primary" type="submit">Verificar</button></form>
+      <button id="mfa-logout" class="text-button">Cerrar sesión</button>
+    </section>
+    <p id="message" role="status" aria-live="polite" hidden></p>
+    <button id="retry" class="text-button" hidden>Volver a comprobar</button>
+  </main>
+  <footer><span>Tu sesión bancaria permanece en el banco.</span><details><summary>Configuración de acceso</summary><p>Patrón de retorno de esta instalación:</p><code id="redirect"></code><p>Debe estar permitida en Supabase de Clatri.</p></details></footer>
+  <script type="module" src="src/ui/sidepanel.js"></script>
+</body>
+</html>

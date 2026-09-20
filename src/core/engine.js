@@ -468,21 +468,9 @@
     return response.json();
   }
 
-  function signature(tx) {
-    return `${tx.date}|${tx.description}|${tx.amount}|${tx.reference}|${tx.bankType}`;
-  }
-
-  /**
-   * Pull every transaction for an account in a date range, walking pages until
-   * one comes back empty or repeats what we already have.
-   */
-  /** Walk the pages of a single date window, appending into `collected`. */
-  async function fetchWindow({ account, profile, from, to, seen, collected, budget, onProgress }) {
+  /** Read a window without collapsing distinct bank occurrences by content. */
+  async function fetchWindow({ account, profile, from, to, collected, budget, onProgress }) {
     const maxPages = profile.supportsPagination ? profile.maxPages || 40 : 1;
-    // Separate from the run-wide `seen`. Windows overlap, so a page full of rows
-    // another window already collected is still new to this one, and treating it
-    // as "nothing new" would end the walk before the window was covered.
-    const windowSeen = new Set();
     let stoppedBy = null;
     let stopKind = null;
     let pages = 0;
@@ -517,21 +505,8 @@
         // Authentication failures cannot be repaired by asking for a smaller
         // date window. Gateway failures often can, including on page one.
         if (error.status === 401 || error.status === 403) throw error;
-        // Bancolombia answers a request past its last page with a generic
-        // failure. It is safe to accept after a non-full successful page; a
-        // full page is still split because it may have hit the real row cap.
-        const belowPageCap =
-          rowCount > 0 && (!profile.pageSizeHint || rowCount < profile.pageSizeHint);
-        if (
-          belowPageCap &&
-          profile.errorAfterRowsIsEnd !== false &&
-          bank.isEndOfWindowError &&
-          bank.isEndOfWindowError(error.status, error.message)
-        ) {
-          completed = true;
-          stopKind = "bank-end-after-rows";
-          break;
-        }
+        // A generic failure never proves that the bank has no more rows.
+        // Only explicit empty responses or pagination metadata can complete it.
         stoppedBy = error.message;
         stopKind = "bank-error";
         break;
@@ -545,28 +520,16 @@
         break;
       }
 
-      let fresh = 0;
       for (const row of rows) {
-        const key = signature(row);
-        if (windowSeen.has(key)) continue;
-        windowSeen.add(key);
-        fresh += 1;
         rowCount += 1;
         if (!minDate || row.date < minDate) minDate = row.date;
         if (!maxDate || row.date > maxDate) maxDate = row.date;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        collected.push({ ...row, account: account.number, currency: account.currency });
+        // Page position identifies an occurrence in this capture only. Identical
+        // visible values (including a reference) do not prove transport replay.
+        collected.push({ ...row, account: account.number, currency: row.currency || account.currency });
       }
 
       if (onProgress) onProgress({ total: collected.length, page, from, to });
-      // Nothing new within this window means the bank handed back a page we
-      // already walked, which is where its list ends.
-      if (fresh === 0) {
-        completed = true;
-        stopKind = "repeated-page";
-        break;
-      }
       if (request.canPaginate === false) {
         completed = true;
         stopKind = "not-paginated";
@@ -619,7 +582,6 @@
     const profile = profileFor(account);
     const noDates = profile.dateFilter === "none";
     const collected = [];
-    const seen = new Set();
     const budget = { spent: 0, limit: 120 };
     let rangeApplied = true;
     let windows = 0;
@@ -654,15 +616,15 @@
      */
     const walk = async (windowFrom, windowTo, depth) => {
       windows += 1;
+      const windowRows = [];
       const result = await fetchWindow({
         account,
         profile,
         from: windowFrom,
         to: windowTo,
-        seen,
-        collected,
+        collected: windowRows,
         budget,
-        onProgress,
+        onProgress: onProgress ? progress => onProgress({ ...progress, total: collected.length + progress.total }) : undefined,
       });
       pages += result.pages;
       windowResults.push({
@@ -675,7 +637,12 @@
         partial: Boolean(result.stoppedBy),
       });
       if (result.rangeApplied === false) rangeApplied = false;
-      if (!result.stoppedBy) return;
+      const acceptWindow = () => {
+        // Child ranges are disjoint. Replace a failed parent's rows with its
+        // children instead of deduplicating them with a lossy content hash.
+        collected.push(...(noDates ? windowRows : windowRows.filter(row => row.date >= windowFrom && row.date <= windowTo)));
+      };
+      if (!result.stoppedBy) { acceptWindow(); return; }
 
       // Splitting only helps when the dates in the request are ours to set.
       const halves =
@@ -683,6 +650,7 @@
           ? shape.halve(windowFrom, windowTo)
           : null;
       if (!halves) {
+        acceptWindow();
         truncated = true;
         stoppedBy = result.stoppedBy;
         return;

@@ -447,8 +447,8 @@ const result = await engine.fetchRange({
 });
 
 check("stops after the empty page", fetchCalls.length, 3);
-check("duplicate row dropped", result.transactions.length, 3);
-check("sorted oldest first", result.transactions.map((t) => t.date), ["2026-07-28", "2026-07-29", "2026-07-30"]);
+check("equal rows on distinct pages are preserved without identity proof", result.transactions.length, 4);
+check("sorted oldest first", result.transactions.map((t) => t.date), ["2026-07-28", "2026-07-29", "2026-07-30", "2026-07-30"]);
 check("reports the span actually covered", result.covered, { from: "2026-07-28", to: "2026-07-30" });
 check("account stamped on each row", [...new Set(result.transactions.map((t) => t.account))], ["00000000000"]);
 check("progress reported per page", progress, [1, 2]);
@@ -463,6 +463,29 @@ ok(
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}:\d{3}$/.test(fetchCalls[0].headers["request-timestamp"]),
   fetchCalls[0].headers["request-timestamp"]
 );
+
+// Two separate bank rows are two occurrences even without IDs or times.
+const bus = { transactionDate: "2026/07/30", description: "BUS", amount: -3200, type: "DEBITO" };
+fetchImpl = async (url, init) => {
+  const body = JSON.parse(init.body);
+  return respond({ data: { transactions: body.pagination.key === 1 ? [bus, { ...bus }] : [] }, meta: { pages: 1 } });
+};
+const twoBusRows = await engine.fetchRange({ account, from: "2026-07-30", to: "2026-07-30" });
+check("two identical rows on a bank page remain two", twoBusRows.transactions.length, 2);
+ok("explicit final page completes a two-occurrence capture", !twoBusRows.truncated);
+// Retrying a failed wide window must replace its evidence with child windows,
+// not add the parent again or collapse identical rows within each child.
+fetchImpl = async (url, init) => {
+  const body = JSON.parse(init.body);
+  const from = body.filter.dateFrom.replace(/\//g, "-");
+  const to = body.filter.dateTo.replace(/\//g, "-");
+  if (body.pagination.key > 1 && from !== to) return { ok: false, status: 500, text: async () => "gateway failed" };
+  const rows = from <= "2026-07-30" && to >= "2026-07-30" ? [bus, { ...bus }] : [];
+  return respond({ data: { transactions: rows }, meta: from === to ? { pages: 1 } : {} });
+};
+const retriedBus = await engine.fetchRange({ account, from: "2026-07-29", to: "2026-07-30" });
+check("split retry preserves two rows without adding parent rows", retriedBus.transactions.length, 2);
+ok("complete child windows replace the failed parent", !retriedBus.truncated);
 
 // Past the last page the gateway errors instead of returning an empty one.
 // Throwing there used to discard every row already collected.
@@ -566,9 +589,9 @@ fetchImpl = async (url, init) => {
 
 const recovered = await engine.fetchRange({ account, from: "2026-07-01", to: "2026-07-31" });
 const dates = recovered.transactions.map((t) => t.date);
-check("uses five weekly windows", recovered.windows, 5);
-ok("did not give up", recovered.truncated === false);
-ok("generic errors after short pages are treated as the end", recovered.windowResults.every((w) => !w.partial));
+ok("ambiguous windows are retried at smaller ranges", recovered.windows > 5);
+ok("generic errors cannot prove the capture complete", recovered.truncated === true);
+ok("generic errors after short pages remain explicit", recovered.windowResults.some((w) => w.partial));
 ok("recovered the first day", dates.includes("2026-07-01"), dates.join());
 ok("recovered the second day", dates.includes("2026-07-02"), dates.join());
 ok("recovered the first day after the silent cap", dates.includes("2026-07-28"), dates.join());
@@ -591,7 +614,7 @@ ok(
   ),
   JSON.stringify(fetchCalls)
 );
-ok("stayed well under the request budget", fetchCalls.length < 40, String(fetchCalls.length));
+ok("stayed well under the request budget", fetchCalls.length <= 120, String(fetchCalls.length));
 
 // A gateway error on page one is retried over smaller windows and ultimately
 // reported as partial if even a single day cannot be fetched.
@@ -715,7 +738,14 @@ engine.state.headers = engine.state.headersByUrl[fraudUrl];
 fetchCalls = [];
 fetchImpl = async (url, init) => {
   fetchCalls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
-  return respond(txResponse(pages[1]));
+  const body = JSON.parse(init.body);
+  const from = body.filter.dateFrom.replace(/\//g, "-");
+  const to = body.filter.dateTo.replace(/\//g, "-");
+  const rows = body.pagination.key === 1 ? pages[1].filter(row => {
+    const date = row.transactionDate.replace(/\//g, "-");
+    return date >= from && date <= to;
+  }) : [];
+  return respond(txResponse(rows));
 };
 const rebuilt = await engine.fetchRange({ account, from: "2026-07-01", to: "2026-07-31" });
 

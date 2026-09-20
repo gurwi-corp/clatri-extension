@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Clatri",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Official Clatri extension. Export your bank transactions to CSV — the browser companion to your AI agent for money, health and life.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -11,19 +11,29 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png"],
-      "matches": ["https://*.bancolombia.com/*"]
+      "resources": [
+        "icons/*.png"
+      ],
+      "matches": [
+        "https://*.bancolombia.com/*"
+      ]
     }
   ],
   "content_scripts": [
     {
-      "matches": ["https://*.bancolombia.com/*"],
-      "js": ["src/bridge.js"],
+      "matches": [
+        "https://*.bancolombia.com/*"
+      ],
+      "js": [
+        "src/bridge.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": ["https://*.bancolombia.com/*"],
+      "matches": [
+        "https://*.bancolombia.com/*"
+      ],
       "js": [
         "src/core/shape.js",
         "src/core/registry.js",
@@ -35,11 +45,35 @@
       "all_frames": true
     },
     {
-      "matches": ["https://*.bancolombia.com/*"],
-      "js": ["src/core/export.js", "src/ui/panel.js"],
+      "matches": [
+        "https://*.bancolombia.com/*"
+      ],
+      "js": [
+        "src/core/export.js",
+        "src/ui/panel.js"
+      ],
       "run_at": "document_idle",
       "world": "MAIN",
       "all_frames": false
     }
-  ]
+  ],
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "identity",
+    "storage",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://db.clatri.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Abrir Clatri"
+  }
 }

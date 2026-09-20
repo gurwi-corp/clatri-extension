@@ -17,8 +17,6 @@
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/clatri/ieblkidehbbodoahabmfbcgbmbafokhc"><img src="https://img.shields.io/chrome-web-store/v/ieblkidehbbodoahabmfbcgbmbafokhc?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white" alt="Chrome Web Store"></a>
   <img src="https://img.shields.io/badge/manifest-v3-1a1a1a" alt="Manifest V3">
-  <img src="https://img.shields.io/badge/permissions-none-17803d" alt="No permissions">
-  <img src="https://img.shields.io/badge/tests-170%20passing-17803d" alt="170 tests passing">
   <img src="https://img.shields.io/badge/license-GPL--3.0-6b7076" alt="GPL-3.0">
 </p>
 
@@ -51,7 +49,8 @@ That listing works in Chrome, Brave, Edge, Opera, Arc, Vivaldi, and other
 Chromium browsers.
 
 > **Pin it.** Click the puzzle piece in the toolbar and pin Clatri so you can see
-> it is loaded. It only ever wakes up on your bank's domain.
+> it is loaded. The bank capture runs only on the bank domain. The toolbar
+> opens a separate Clatri account panel in the development build.
 
 ## Use
 
@@ -217,3 +216,35 @@ covers the code, not those marks.
 
 Contributions are assigned to Gurwi LLC under the [CLA](CLA.md). Built
 alongside [Clatri](https://clatri.com).
+
+## Development build: Clatri sign-in
+
+The working branch adds Google/Apple sign-in in a Chrome side panel, with
+Supabase PKCE and storage restricted to trusted extension contexts. It is not
+yet the published Web Store version. Bank login remains in the bank tab; direct
+transaction import is not enabled in this increment. CSV remains available.
+
+Use Node 22 or newer:
+
+```bash
+npm ci
+npm test
+npm run build
+```
+
+Load **dist/** as an unpacked extension in Chrome's developer mode, not the
+repository root: the background worker needs its locally bundled dependencies.
+The build prints the Supabase redirect allow-list pattern for its stable dev ID.
+See [OAuth setup](docs/oauth-setup.md) for the exact Clatri configuration,
+production ID and verification steps. `config/public.json` contains only a
+public URL and publishable key; never put service-role or OAuth client secrets
+in it. `config/development-key.json` contains only a public key for a stable
+unpacked ID, not a signing private key.
+
+`npm run build -- --store` builds without the development key and diagnostics;
+it does not publish. The store assigns the production ID.
+
+A bank page's two identical rows are kept as two occurrences. Retrying a split
+window replaces its parent rows instead of deduplicating by amount/date/text.
+Generic bank errors now leave a capture explicitly incomplete, even after a
+short page. Only explicit pagination/empty-page evidence completes a capture.
