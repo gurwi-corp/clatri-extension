@@ -116,6 +116,8 @@ const documentElement = makeEl("html");
 const sandbox = {
   console: { ...console, error: () => {} },
   crypto: { randomUUID: () => "11111111-2222-4333-8444-555555555555" },
+  addEventListener() {},
+  postMessage(message) { sandbox.__messages = [...(sandbox.__messages || []), message]; },
   Headers: globalThis.Headers,
   Request: globalThis.Request,
   URL: globalThis.URL,
@@ -362,6 +364,19 @@ await new Promise((resolve) => setTimeout(resolve, 0));
 ok("the copy icon reuses the rows without a new download", downloads === 1 && copied !== null);
 ok("and copies them in the chosen format", /"transactions"/.test(copied || ""));
 ok("says so", (spanish ? /copiados como JSON/ : /copied as JSON/).test(byId.msg.textContent), byId.msg.textContent);
+
+// An unconfirmed end is different from known missing pages.
+NS.engine.fetchRange = async () => ({ transactions:[{date:'2026-07-03',description:'RECEIVED',amount:-10,currency:'COP'}], truncated:true, completion:'unknown', covered:{from:'2026-07-03',to:'2026-07-03'},rangeApplied:true,windows:1 });
+byId.run.fire('click');
+await new Promise(resolve=>setTimeout(resolve,0));
+ok('unknown completion downloads normally without an incomplete filename', downloads === 2 && !sandbox.__lastDownload.name.includes('incomplete'));
+ok('unknown completion stays explicit in JSON metadata', JSON.parse(sandbox.__lastDownload.content).capture_status === 'unknown');
+byId.sendClatri.fire('click');
+await new Promise(resolve=>setTimeout(resolve,0));
+const staged = sandbox.__messages.find(message=>message.channel==='clatri-stage-transfer');
+ok('send stages normalized observations without bank headers', staged?.capture.items.length===1 && !('headers' in staged.capture));
+ok('uncertain coverage is never asserted complete for import', staged?.capture.complete === false);
+downloads=1;
 
 // Changes made while a request is pending must not relabel old account data.
 let finishRequest;

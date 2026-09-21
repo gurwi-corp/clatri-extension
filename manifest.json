@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Clatri",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "__MSG_extensionDescription__",
   "icons": {
     "16": "icons/icon-16.png",
@@ -65,7 +65,8 @@
     "sidePanel"
   ],
   "host_permissions": [
-    "https://db.clatri.com/*"
+    "https://db.clatri.com/*",
+    "https://api.clatri.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",

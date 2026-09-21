@@ -479,6 +479,7 @@
     let minDate = null;
     let maxDate = null;
     let completed = false;
+    let expectedMore = false;
 
     for (let page = 1; page <= maxPages; page += 1) {
       if (budget.spent >= budget.limit) {
@@ -514,6 +515,7 @@
 
       pages = page;
       const rows = bank.parseTransactions(json);
+      expectedMore = bank.hasNextPage?.(json, page) === true;
       if (!rows.length) {
         completed = true;
         stopKind = "empty-page";
@@ -548,6 +550,7 @@
     }
 
     return {
+      completion: completed ? "complete" : stopKind === "bank-error" && pages > 0 && !expectedMore ? "unknown" : "incomplete",
       stoppedBy,
       stopKind,
       pages,
@@ -587,6 +590,7 @@
     let windows = 0;
     let pages = 0;
     let truncated = false;
+    let completion = "complete";
     let stoppedBy = null;
     const windowResults = [];
 
@@ -652,6 +656,8 @@
       if (!halves) {
         acceptWindow();
         truncated = true;
+        if (result.completion === "incomplete") completion = "incomplete";
+        else if (completion === "complete") completion = "unknown";
         stoppedBy = result.stoppedBy;
         return;
       }
@@ -695,6 +701,7 @@
       rangeApplied,
       dateFilter: profile.dateFilter,
       truncated,
+      completion,
       stoppedBy,
       windowResults,
     };
@@ -707,6 +714,7 @@
       pages,
       covered,
       truncated,
+      completion,
       stoppedBy,
       windowResults,
     };

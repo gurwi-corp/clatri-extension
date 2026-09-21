@@ -1,4 +1,5 @@
 {
   "supabaseUrl": "https://db.clatri.com",
-  "supabasePublishableKey": "sb_publishable_vjxIDFSjidGLqJlhv6FWVg_WE-q0j-S"
+  "supabasePublishableKey": "sb_publishable_vjxIDFSjidGLqJlhv6FWVg_WE-q0j-S",
+  "apiBase": "https://api.clatri.com/api/v1/money/extension"
 }

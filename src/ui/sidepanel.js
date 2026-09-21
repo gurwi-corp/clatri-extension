@@ -23,6 +23,7 @@ function render(result) {
   byId('mfa').hidden = result.status !== 'mfa_required';
   byId('email').textContent = result.user?.email || t("Your Clatri account");
   byId('code').value = '';
+  globalThis.ClatriTransfer?.authChanged(result.status === 'signed_in');
   if (result.status === 'mfa_required') byId('code').focus();
   if (result.revocation_pending) notify(t("Signed out of this extension. Without a connection, we couldn’t confirm revocation on the server."));
 }
@@ -30,7 +31,7 @@ let running = false;
 async function request(type, data = {}) {
   if (running) return;
   running = true; notify(); byId('retry').hidden = true;
-  document.querySelectorAll('button').forEach(button => { button.disabled = true; });
+  document.querySelectorAll('button').forEach(button => { if (!button.closest('.transfer')) button.disabled = true; });
   try {
     const response = await chrome.runtime.sendMessage({ type, ...data });
     if (!response?.ok) throw new Error(response?.error || 'auth_unavailable');
@@ -41,7 +42,7 @@ async function request(type, data = {}) {
     byId('retry').hidden = false;
   } finally {
     running = false;
-    document.querySelectorAll('button').forEach(button => { button.disabled = false; });
+    document.querySelectorAll('button').forEach(button => { if (!button.closest('.transfer')) button.disabled = false; });
   }
 }
 for (const provider of ['google', 'apple']) byId(provider).addEventListener('click', () => request('auth.signIn', { provider }));

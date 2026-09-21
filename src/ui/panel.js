@@ -289,6 +289,7 @@
             <div class="picker" id="format" aria-expanded="false"></div>
           </div>
 
+          <button class="primary" id="sendClatri">${t("Send to Clatri")}</button>
           <div class="actions">
             <button class="primary" id="run">${t("Download CSV")}</button>
             <button class="icon" id="copy" title="${t("Copy to clipboard")}" aria-label="${t("Copy to clipboard")}">
@@ -592,6 +593,7 @@
     if (ui.partial && ui.partial.key !== exportKey(selectedAccount())) ui.partial = null;
     el("downloadPartial").hidden = !ui.partial || ui.busy;
     el("downloadPartial").disabled = ui.busy;
+    el("sendClatri").disabled = ui.busy || !selectedAccount();
     el("downloadPartial").textContent = t("Download recovered rows ({count}) · incomplete", { count: ui.partial?.transactions.length || 0 });
 
     const message = el("msg");
@@ -672,7 +674,7 @@
     say(t("Requesting transactions…"));
 
     try {
-      const { transactions, rangeApplied, fetched, windows, truncated, covered } = await engine.fetchRange({
+      const { transactions, rangeApplied, fetched, windows, truncated, covered, completion } = await engine.fetchRange({
         account,
         from: ui.from,
         to: ui.to,
@@ -685,16 +687,29 @@
         say(t("The selection changed during the request. Download again for the selected account and dates."));
         return;
       }
-      ui.results = truncated ? null : transactions;
-      ui.resultsContext = contextFor(account, covered);
-      ui.resultsKey = truncated ? null : exportKey(account);
+      const usable = !truncated || completion === "unknown";
+      ui.results = usable ? transactions : null;
+      ui.resultsContext = { ...contextFor(account, covered), ...(completion === "unknown" ? { completion: "unknown" } : {}) };
+      ui.resultsKey = usable ? exportKey(account) : null;
 
       // Without a date filter to rewrite, Clatri only gets the bank's own window.
       const teachRange = t(" Clatri found no date filter in the bank request, so it can only read the range the bank chose. Set Desde and Hasta in the bank’s search, press search once, then come back.");
 
       // Never download an incomplete capture automatically or offer it for
       // automatic import. A separate explicit download can recover the rows.
-      if (truncated) {
+      if (mode === 'send' && transactions.length) {
+        if (transactions.length > 500) { say(t("Choose a shorter period: one send supports up to 500 transactions."), 'error'); return; }
+        const items = transactions.map(row => ({
+          booking_date:row.date, description:row.description, reference:row.reference || null,
+          original_amount:row.exactAmount === undefined ? String(Math.abs(row.amount)) : row.exactAmount, original_currency:row.currency || account.currency,
+          direction:row.amount < 0 ? 'outgoing' : 'incoming',
+          status:row.bankType === 'PENDIENTE' ? 'pending' : 'completed', timezone:'America/Bogota',
+        }));
+        window.postMessage({channel:'clatri-stage-transfer',capture:{institution:'co-bancolombia',product:account.kind === 'card' ? 'card' : 'deposit',number:account.number,from:locked ? covered.from : ui.from,to:locked ? covered.to : ui.to,complete:!truncated,items}},location.origin);
+        say(t("Choose your entity and destination account in Clatri’s extension panel. If it did not open, click the Clatri icon in your browser."));
+        return;
+      }
+      if (truncated && completion !== "unknown") {
         if (transactions.length) {
           ui.partial = {
             transactions,
@@ -739,7 +754,8 @@
       const resultMessage = mode === "copy"
         ? t("{count} transactions copied as {format}.", { count: transactions.length, format: formatOf(ui.format).label })
         : t("{count} transactions exported.", { count: transactions.length });
-      say(resultMessage + span + split + (rangeApplied ? "" : teachRange),
+      const ending = completion === "unknown" ? t(" The bank did not confirm the end of the list; the file contains every transaction received.") : "";
+      say(resultMessage + span + ending + split + (rangeApplied ? "" : teachRange),
         !rangeApplied ? "neutral" : "ok"
       );
     } catch (error) {
@@ -824,6 +840,11 @@
     render();
   });
 
+  window.addEventListener('message', event => {
+    if (event.source !== window || event.origin !== location.origin || event.data?.channel !== 'clatri-transfer-staged') return;
+    if (!event.data.ok) say(t("The transactions could not be prepared. Reload the extension and the bank page, then retry."), 'error');
+  });
+  el("sendClatri").addEventListener('click', () => run('send'));
   el("run").addEventListener("click", () => run("download"));
   el("copy").addEventListener("click", () => run("copy"));
 

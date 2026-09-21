@@ -1203,5 +1203,9 @@ ok("never leaks a card token", !reportText.includes("ENC-TOKEN") && !reportText.
 ok("says which kinds of product it saw", JSON.stringify(report.accountKinds).includes("card"));
 ok("lists templates per kind", "deposit" in report.templatesCaptured);
 
+const exactRows = engine.bank.parseTransactions({data:[{date:'2026-09-01',description:'EXACT',amount:'9007199254740993.25',currency:'USD',reference1:'',reference:'synthetic-ref'}]});
+check('exact decimal strings survive the numeric export representation', exactRows[0].exactAmount, '9007199254740993.25');
+check('explicit transaction currency survives', exactRows[0].currency, 'USD');
+check('empty first reference does not hide a real alternate reference', exactRows[0].reference, 'synthetic-ref');
 console.log(failures ? `\n${failures} failing check(s)\n` : "\nAll checks passed\n");
 process.exit(failures ? 1 : 0);
