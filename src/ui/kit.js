@@ -186,26 +186,6 @@
     .disclosure svg { flex: none; transform: rotate(-90deg); transition: transform var(--t-med) var(--ease); }
     .disclosure[aria-expanded="true"] svg { transform: none; }
 
-    /* Choice. One of a few visible options; use it instead of a picker when
-       seeing every option side by side is the point. */
-    .choices { display: grid; gap: 6px; }
-    .choice {
-      display: flex; align-items: center; gap: 9px; width: 100%; min-height: var(--h-field); padding: 7px 11px;
-      border: 1px solid var(--c-line); border-radius: var(--r-field); background: transparent;
-      color: var(--c-ink); font-size: 13px; line-height: 1.3; text-align: left; cursor: pointer;
-      transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
-    }
-    .choice:hover:not(:disabled) { background: var(--c-field-hover); }
-    .choice[aria-checked="true"] { border-color: var(--c-line-strong); background: var(--c-field); }
-    .choice:disabled { color: var(--c-ink-3); cursor: not-allowed; }
-    .choice .text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-    .choice .hint { flex: none; font-size: 12px; color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
-    .choice-mark {
-      flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--c-ink-3);
-      transition: border-color var(--t-fast) var(--ease), border-width var(--t-fast) var(--ease);
-    }
-    .choice[aria-checked="true"] .choice-mark { border: 4.5px solid var(--c-ink); }
-
     .chip {
       height: 28px; padding: 0 12px; border: 1px solid var(--c-line); border-radius: var(--r-pill);
       background: transparent; color: var(--c-ink-2); font-size: 12px; cursor: pointer;
