@@ -106,11 +106,13 @@ that distinction. Storage restriction is not encryption against device malware.
 ## Next implementation stages
 
 The API has initial closed observation contracts, conservative identity helpers,
-and a separate Supabase user-JWT dependency in the Clatri repository. They are not
-yet exposed as financial import endpoints. Durable jobs, bindings, atomic
-materialization, LLM categorization, historical FX, capture-to-API transport,
-Flutter/web account detail integration and Gurwi Analytics remain pending.
-Do not turn on a send-transactions button before those stages are validated.
+and a separate Supabase user-JWT dependency in the Clatri repository.
+As of 0.13.0, the API receives per-send destinations and durable jobs, categorizes
+movements and commits them atomically. The in-bank extension-origin form owns
+selection and confirmation. Gurwi Analytics consumes service-only usage aggregates.
+No shared API secret is shipped. Persistent bank bindings are intentionally absent.
+Historical FX uses the existing cache; unavailable rates and card payments/refunds
+remain explicit issues. The development extension ID and OAuth callback are unchanged.
 
 ## References
 

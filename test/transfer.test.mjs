@@ -33,6 +33,7 @@ test('trusted send chooses an authorized target and delivers one exact envelope'
   const {capture:current}=await f.transfer.handle({type:'transfer.context'});
   await f.transfer.handle({type:'transfer.send',capture_id:current.id,entity_id:'entity',account_id:'account',card_id:null});
   const send=f.requests.find(r=>r.url.endsWith('/imports'));const body=JSON.parse(send.init.body);
+  assert.equal(body.entity_id,'entity');assert.equal(body.account_id,'account');assert.equal('binding_id' in body,false);assert.equal(f.requests.some(r=>r.url.endsWith('/bindings')),false);
   assert.equal(body.items[0].original_amount,'3000.00');assert.equal(body.capture_id,current.id);assert.equal(body.coverage.complete,false);
   assert.equal(send.init.credentials,'omit');assert.equal(send.init.redirect,'error');assert.equal(send.init.headers.Authorization,'Bearer synthetic-jwt');
   assert.ok(f.localStore['extension-import:user'].job);
@@ -47,4 +48,12 @@ test('stale captures, unknown destinations and arbitrary routes cannot submit',a
 test('two identical occurrences receive different item keys',async()=>{
   const f=fixture();const value=capture();value.items.push({...value.items[0]});await f.transfer.stage(value,7);
   const staged=f.sessionStore['capture:7'];assert.equal(staged.items.length,2);assert.notEqual(staged.items[0].item_key,staged.items[1].item_key);
+});
+
+test('remembered destination is user scoped and is never an authorization grant',async()=>{
+ const f=fixture();await f.transfer.stage(capture(),7);const state=await f.transfer.handle({type:'transfer.context'},7);
+ await f.transfer.handle({type:'transfer.send',capture_id:state.capture.id,entity_id:'entity',account_id:'account',card_id:null},7);
+ assert.equal((await f.transfer.handle({type:'transfer.context'},7)).selection.account_id,'account');
+ await assert.rejects(f.transfer.handle({type:'transfer.send',capture_id:state.capture.id,entity_id:'entity',account_id:'foreign',card_id:null},7),/invalid_destination/);
+ assert.equal((await f.transfer.handle({type:'transfer.context'},8)).capture,null);
 });

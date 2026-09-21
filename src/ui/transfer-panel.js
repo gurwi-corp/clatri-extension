@@ -2,7 +2,7 @@
   const {t}=globalThis.ClatriI18n;
   const el=id=>document.getElementById(id);
   let state=null, signedIn=false, busy=false, timer=null, generation=0;
-  const errors={auth_unavailable:'Sending is unavailable on the server. Your transactions have not been confirmed as imported.',sign_in_required:'Sign in again to continue.',capture_changed:'The bank selection changed. Refresh before sending.',destination_conflict:'This bank account is already linked to another destination in this entity.',import_busy:'Another import is in progress. Try again shortly.',import_unavailable:'Sending is unavailable on the server. Your transactions have not been confirmed as imported.'};
+  const errors={auth_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.',sign_in_required:'Sign in again to continue.',capture_changed:'The bank selection changed. Refresh before sending.',destination_conflict:'This bank account is already linked to another destination in this entity.',import_busy:'Another import is in progress. Try again shortly.',import_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.'};
   async function message(type, data={}) {
     const response=await chrome.runtime.sendMessage({type,...data});
     if (!response?.ok) throw new Error(response?.error || 'import_unavailable');
@@ -22,7 +22,8 @@
   }
   async function refresh() {
     if(!signedIn || busy) return;
-    const version=generation;
+    const version=++generation;
+    status(t('Loading your Clatri accounts…'));
     try {
       const result=await message('transfer.context');
       if(version!==generation || !signedIn) return;
@@ -30,10 +31,15 @@
       el('destination').hidden=!state.capture;
       el('capture-summary').textContent=state.capture ? t('{count} transactions · ending {last4} · {from} to {to}',{count:state.capture.count,last4:state.capture.last4,from:state.capture.coverage.start,to:state.capture.coverage.end}) : t('In your bank, open your transactions and click “Send to Clatri”.');
       if(state.capture && !state.capture.coverage.complete) el('capture-summary').textContent+=' '+t('The bank did not confirm the end of the list. Only the received transactions will be sent.');
-      options(el('entity'),state.entities,'Choose an entity'); destinations();
+      options(el('entity'),state.entities,'Choose an entity');
+      if(state.selection && state.entities.some(e=>e.id===state.selection.entity_id)) el('entity').value=state.selection.entity_id;
+      destinations();
+      const saved=state.capture?.product==='card' ? state.selection?.card_id : state.selection?.account_id;
+      if(saved && [...el('destination-account').options].some(o=>o.value===saved)) {el('destination-account').value=saved;el('send-transactions').disabled=false;}
+      el('destination-label').textContent=t(state.capture?.product==='card' ? 'Credit card in Clatri' : 'Bank account in Clatri');
       if(state.job) poll(state.job,version);
       else status('');
-    } catch(error) { if(version===generation) status(t(errors[error.message] || errors.import_unavailable)); }
+    } catch(error) { if(version===generation) {el('destination').hidden=true;status(t(errors[error.message] || errors.import_unavailable));} }
   }
   async function poll(id,version=generation) {
     clearTimeout(timer);

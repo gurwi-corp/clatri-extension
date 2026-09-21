@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Clatri",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "__MSG_extensionDescription__",
   "icons": {
     "16": "icons/icon-16.png",
@@ -12,7 +12,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "icons/*.png"
+        "icons/*.png",
+        "bank-transfer.html"
       ],
       "matches": [
         "https://*.bancolombia.com/*"
@@ -78,5 +79,8 @@
   "action": {
     "default_title": "__MSG_openClatri__"
   },
-  "default_locale": "en"
+  "default_locale": "en",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-ancestors https://*.bancolombia.com;"
+  }
 }

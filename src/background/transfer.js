@@ -33,13 +33,24 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
     if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'sign_in_required' : response.status === 409 ? 'destination_conflict' : response.status === 429 ? 'import_busy' : 'import_unavailable');
     return response.json();
   }
-  async function current() {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  async function current(tabId) {
+    const [tab] = Number.isInteger(tabId) ? [{id:tabId}] : await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (!tab) return null;
     const capture = (await chrome.storage.session.get('capture:' + tab.id))['capture:' + tab.id];
     return capture?.expires_at > Date.now() ? capture : null;
   }
   return {
+    async usage(action, product=null) {
+      // Optional signed-in usage; no money, bank numbers, names or raw errors.
+      try {
+        const session=await user();
+        const version=chrome.runtime.getManifest().version;
+        const key='usage:'+session.user.id+':'+new Date().toISOString().slice(0,10)+':'+version+':'+action+':'+(product||'');
+        if(action!=='csv_generated' && (await chrome.storage.local.get(key))[key]) return;
+        await api('/usage',session,{event_id:crypto.randomUUID(),action,product,institution:product?'co-bancolombia':null,connector_version:version});
+        if(action!=='csv_generated') await chrome.storage.local.set({[key]:true});
+      } catch {} // telemetry never blocks sign-in or export
+    },
     async stage(payload, tabId) {
       const value = validateCapture(payload);
       const last4 = value.number.replace(/[^0-9]/g,'').slice(-4);
@@ -49,14 +60,15 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
       await chrome.storage.session.set({ ['capture:' + tabId]: capture });
       return { staged: true }; // nothing about Clatri is returned to the bank page
     },
-    async handle(message) {
+    async handle(message, tabId) {
       const session = await user();
       const uid = session.user.id;
       if (message.type === 'transfer.context' && allowed(message,['type'])) {
-        const capture = await current();
+        const capture = await current(tabId);
         const last = (await chrome.storage.local.get('extension-import:' + uid))['extension-import:' + uid];
         const context = await api('/context', session);
-        return { ...context, capture: capture ? { id:capture.id, product:capture.product, last4:capture.source_last4, coverage:capture.coverage, count:capture.items.length } : null, job: last?.job || null };
+        const selection = capture ? (await chrome.storage.local.get('destination:'+uid+':'+capture.source_key))['destination:'+uid+':'+capture.source_key] : null;
+        return { ...context, selection, capture: capture ? { id:capture.id, product:capture.product, last4:capture.source_last4, coverage:capture.coverage, count:capture.items.length } : null, job: last?.job || null };
       }
       if (message.type === 'transfer.status' && allowed(message,['type','id']) && /^[0-9a-f-]{36}$/.test(message.id)) return api('/imports/' + message.id,session);
       if (message.type === 'transfer.resolve' && allowed(message,['type','id','item_key','action','expected_version','target_event_id']) && /^[0-9a-f-]{36}$/.test(message.id) && text(message.item_key,128) && Number.isInteger(message.expected_version) && ['distinct','same_existing'].includes(message.action)) {
@@ -65,16 +77,16 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
       if (message.type !== 'transfer.send' || !allowed(message,['type','capture_id','entity_id','account_id','card_id']) || sending) throw new Error('invalid_message');
       sending = true;
       try {
-        const capture = await current();
+        const capture = await current(tabId);
         if (!capture || capture.id !== message.capture_id) throw new Error('capture_changed');
         const context = await api('/context',session);
         const entity = context.entities.find(e=>e.id === message.entity_id);
         const target = capture.product === 'card' ? entity?.cards.find(c=>c.id === message.card_id) : entity?.accounts.find(a=>a.id === message.account_id);
         if (!target) throw new Error('invalid_destination');
-        const binding = await api('/bindings',session,{ entity_id:entity.id, account_id:capture.product === 'card' ? target.account_id : target.id, card_id:capture.product === 'card' ? target.id : null, institution:capture.institution, source_key:capture.source_key, source_last4:capture.source_last4, product:capture.product });
-        const envelope = { schema_version:1, binding_id:binding.id, capture_id:capture.id, part_index:0, part_count:1, connector_version:chrome.runtime.getManifest().version, coverage:capture.coverage, items:capture.items };
+        const destination={entity_id:entity.id,account_id:capture.product==='card' ? target.account_id : target.id,card_id:capture.product==='card' ? target.id : null};
+        const envelope = { schema_version:1, ...destination, institution:capture.institution, product:capture.product, capture_id:capture.id, part_index:0, part_count:1, connector_version:chrome.runtime.getManifest().version, coverage:capture.coverage, items:capture.items };
         const job = await api('/imports',session,envelope);
-        await chrome.storage.local.set({ ['extension-import:' + uid]: {job:job.id} });
+        await chrome.storage.local.set({ ['extension-import:' + uid]: {job:job.id}, ['destination:'+uid+':'+capture.source_key]:destination });
         return job;
       } finally { sending = false; }
     },

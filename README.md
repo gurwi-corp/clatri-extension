@@ -160,26 +160,17 @@ never accepted silently.
 
 ### On privacy
 
-The goal is that there is nothing to leak.
-
-- **No credentials.** It cannot log in and never sees your password or PIN
-- **No storage.** Everything lives in memory and is gone when you close the tab
-- **No servers.** Nothing is sent anywhere. The only host it talks to is your
-  bank, from your bank's own page
-- **No permissions.** No `host_permissions`, no background worker, no analytics.
-  It cannot read any site other than your bank's
-- **Read only.** There is no code path that moves money. It repeats the same read
-  request the page already made
-
-The source is here, it is small, and it is worth a look before you trust it with
-anything financial.
+- Bank login stays in the bank portal. The extension never sends bank cookies, tokens, passwords or PINs to Clatri.
+- CSV/JSON files are generated in your browser. When you choose **Send to Clatri**, normalized movements are sent to `api.clatri.com` for storage, categorization and duplicate handling in the entity/account/card you select.
+- Clatri sign-in uses Supabase. Its session is kept in extension storage restricted to trusted extension contexts. The in-bank destination form runs on the extension origin; the bank page cannot read its profile or destination controls.
+- The last destination is remembered locally per signed-in user and bank product. It is a preference, not a permanent server-side bank connection. Prepared captures expire after ten minutes or bank-page navigation.
+- While signed in, minimal usage events record user ID, action, institution/country, product type, extension version and server time for private Gurwi Analytics. Events contain no account numbers, transaction descriptions, balances or amounts. Signed-out activity is not recorded. Telemetry failures do not block exports.
+- The connector only reads movements; it does not transfer money. **Send** imports records into Clatri.
 
 ## What is next
 
 - More banks and more countries, starting wherever contributors are
 - Savings pockets, not just accounts and credit cards
-- Sending transactions **straight into Clatri**, so the CSV round trip becomes
-  optional
 
 ## Two things to know
 
@@ -256,3 +247,17 @@ The side panel and bank export panel follow the browser UI language automaticall
 Spanish regional variants use Spanish; English and other languages use English.
 Reload the extension and the bank tab after changing the browser language.
 Bank descriptions, transaction data and CSV/JSON field names keep their original format.
+
+## Send to Clatri (0.13.0)
+
+In the bank panel, choose the source account/card and period, then **Send to Clatri**.
+The destination form appears inside that same panel. Choose your Clatri entity,
+then a bank account for deposit movements or an existing credit card for card
+movements. Confirm the send; its result appears there. Your last destination is
+remembered and remains editable. The toolbar side panel is for sign-in and account
+management, not transaction delivery.
+
+Each send supports up to 500 movements. The server validates destination access
+again. Identical rows within a capture remain separate occurrences; ambiguous
+matches against earlier records get individual resolution actions. Card payments,
+refunds and unavailable historical exchange rates can remain as issues.
