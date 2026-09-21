@@ -3,13 +3,8 @@
   "use strict";
   const spanish = {
     "Checking your session…": "Comprobando tu sesión…",
-    "WELCOME TO CLATRI": "BIENVENIDO A CLATRI",
-    "One account.": "Una sola cuenta.",
-    "In Chrome too.": "También en Chrome.",
-    "Sign in with the same account you use on ": "Entra con la misma cuenta que usas en ",
     "Continue with Google": "Continuar con Google",
     "Continue with Apple": "Continuar con Apple",
-    "Signing in to Clatri does not connect your bank or send transactions.": "Iniciar sesión en Clatri no conecta tu banco ni envía movimientos.",
     "YOUR CLATRI ACCOUNT": "TU CUENTA CLATRI",
     "Signed in": "Sesión iniciada",
     "Connected to Clatri": "Conectada a Clatri",
@@ -99,7 +94,9 @@
     "Failed to fetch": "No se pudo conectar con el banco. Revisa tu conexión e inténtalo de nuevo.",
     "When you visit a banking institution supported by this extension, you’ll be able to download your transactions or send them to your Clatri account.": "Cuando estés en una institución bancaria compatible con esta extensión, podrás descargar tus movimientos o enviarlos a tu cuenta de Clatri.",
     "Remember, you can contribute to the extension and add more institutions on ": "Recuerda que puedes contribuir a la extensión y añadir más instituciones en ",
-    "View supported institutions": "Ver instituciones compatibles"
+    "View supported institutions": "Ver instituciones compatibles",
+    "Welcome to Clatri Extension": "Bienvenido a Clatri Extension",
+    "With this extension, you’ll be able to download your bank transactions and send them to your account on ": "Con esta extensión podrás descargar tus transacciones bancarias y enviarlas a tu cuenta de "
   };
   function locale() {
     const language = globalThis.chrome?.i18n?.getUILanguage?.()
