@@ -3,6 +3,8 @@
   const kit=globalThis.ClatriKit;
   const el=id=>document.getElementById(id);
   let state=null, signedIn=false, busy=false, timer=null, generation=0;
+  // The import made from the rows on screen: 'none' | 'pending' | 'completed' | 'failed', and where it went.
+  let jobStatus='none', sentKey=null;
   const errors={auth_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.',sign_in_required:'Sign in again to continue.',capture_changed:'The bank selection changed. Refresh before sending.',destination_conflict:'This bank account is already linked to another destination in this entity.',import_busy:'Another import is in progress. Try again shortly.',import_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.'};
   const reasons={possible_duplicate:'Possible duplicate; no extra movement created.',historical_fx_unavailable:'Historical exchange rate unavailable.',card_payment_or_refund:'Card payment or refund requires identification.',bank_status_not_completed:'Not yet completed at the bank.'};
   async function message(type, data={}) {
@@ -10,7 +12,7 @@
     if (!response?.ok) throw new Error(response?.error || 'import_unavailable');
     return response.result;
   }
-  function status(text,tone='') { el('transfer-status').textContent=text; el('transfer-status').className='msg'+(tone ? ' '+tone : ''); }
+  function status(text,tone='') { kit.say(el('transfer-status'),text,tone==='working'); el('transfer-status').className='msg'+(tone && tone!=='working' ? ' '+tone : ''); }
   const fail=error=>status(t(errors[error.message] || errors.import_unavailable),'error');
 
   // Same picker as the bank panel: `node.value` plus a "change" event. Nothing
@@ -19,18 +21,26 @@
   function options(node,items,value,placeholder,labelledby) {
     kit.picker.fill(node,choices(items),value || (items.length===1 ? items[0].id : ''),{placeholder:t(placeholder),autoSelect:false,disabled:busy,labelledby});
   }
-  const canSend=()=>!busy && Boolean(state?.capture?.count && el('entity').value && el('destination-account').value);
+  const destinationKey=()=>el('entity').value+'|'+el('destination-account').value;
+  // One import at a time, and never the same rows to the same place twice. A
+  // failed import may go again; another destination is a different send.
+  const alreadySent=()=>sentKey===destinationKey() && jobStatus!=='failed' && jobStatus!=='none';
+  const canSend=()=>!busy && jobStatus!=='pending' && !alreadySent() && Boolean(state?.capture?.count && el('entity').value && el('destination-account').value);
+  function syncSend() {
+    el('send-transactions').disabled=!canSend();
+    el('send-transactions').textContent=t(alreadySent() && jobStatus==='completed' ? 'Sent to Clatri' : 'Send to Clatri');
+  }
   function destinations(saved) {
     const entity=state?.entities.find(e=>e.id===el('entity').value);
     const items=(state?.capture?.product==='card' ? entity?.cards : entity?.accounts) || [];
     options(el('destination-account'),items,items.some(item=>item.id===saved) ? saved : '','Choose a destination','destination-label');
     el('destination-empty').hidden=!entity || items.length>0;
-    el('send-transactions').disabled=!canSend();
+    syncSend();
   }
   function lock(flag) {
     busy=flag;
     kit.picker.disable(el('entity'),flag);kit.picker.disable(el('destination-account'),flag);
-    el('send-transactions').disabled=!canSend();
+    syncSend();
   }
   async function refresh() {
     if(!signedIn || busy) return;
@@ -49,6 +59,8 @@
       // Nothing loaded yet: the bank panel says so next to its Load button.
       if(state.capture && !state.capture.count) el('capture-summary').textContent='';
       if(state.capture?.count && !state.capture.coverage.complete) el('capture-summary').textContent+=' '+t('The bank did not confirm the end of the list. Only the received transactions will be sent.');
+      sentKey=state.sent ? state.sent.entity_id+'|'+(state.capture?.product==='card' ? state.sent.card_id : state.sent.account_id) : null;
+      jobStatus=state.job ? 'pending' : 'none';
       const entityId=previous?.entity || state.selection?.entity_id;
       options(el('entity'),state.entities,state.entities.some(e=>e.id===entityId) ? entityId : '','Choose an entity','entity-label');
       destinations(previous?.account || (state.capture?.product==='card' ? state.selection?.card_id : state.selection?.account_id));
@@ -87,32 +99,39 @@
       const job=await message('transfer.status',{id});
       if(!signedIn || version!==generation) return;
       el('import-issues').replaceChildren();
+      jobStatus=job.status==='completed' ? 'completed' : ['failed','cancelled'].includes(job.status) ? 'failed' : 'pending';
+      syncSend();
       if(job.status==='completed') {
-        status(t('{created} imported · {issues} need attention · {pending} pending at the bank',{...job.result}),'ok');
+        // Only what happened: a clean import is one short line, not three counts.
+        const counts=[t('{count} imported',{count:job.result.created || 0})];
+        if(job.result.issues) counts.push(t('{count} need attention',{count:job.result.issues}));
+        if(job.result.pending) counts.push(t('{count} pending at the bank',{count:job.result.pending}));
+        status(counts.join(' · '),job.result.issues ? '' : 'ok');
         for(const item of job.items || []) if(item.outcome==='issue' || item.outcome==='pending') el('import-issues').append(issueRow(job,item,version));
         if(job.result.classification?.startsWith('unclassified')) status(el('transfer-status').textContent+' '+t('Automatic categorization was unavailable.'),'ok');
       } else if(['failed','cancelled'].includes(job.status)) status(t('The import could not be completed.'),'error');
-      else { status(t('Received by Clatri. Processing transactions…'));timer=setTimeout(()=>poll(id,version),2500); }
-    } catch(error) { if(version===generation) fail(error); }
+      else { status(t('Received by Clatri. Processing transactions…'),'working');timer=setTimeout(()=>poll(id,version),2500); }
+    } catch(error) { if(version===generation) {jobStatus='failed';syncSend();fail(error);} }
   }
   for(const id of ['entity','destination-account']) kit.picker.wire(el(id),{grow:document.body});
   el('refresh-transfer').innerHTML=kit.icons.refresh;
   el('refresh-transfer').title=t('Refresh');el('refresh-transfer').setAttribute('aria-label',t('Refresh'));
   el('logout').insertAdjacentHTML('afterbegin',kit.icons.signOut);
   el('entity').addEventListener('change',()=>destinations());
-  el('destination-account').addEventListener('change',()=>{el('send-transactions').disabled=!canSend();});
+  el('destination-account').addEventListener('change',syncSend);
   el('refresh-transfer').addEventListener('click',refresh);
   el('send-transactions').addEventListener('click',async()=>{
     if(!canSend()) return;
     lock(true);
     const version=generation;
-    status(t('Sending transactions…'));
+    status(t('Sending transactions…'),'working');
+    sentKey=destinationKey();jobStatus='pending';
     try {
       const job=await message('transfer.send',{capture_id:state.capture.id,entity_id:el('entity').value,account_id:state.capture.product==='deposit' ? el('destination-account').value : null,card_id:state.capture.product==='card' ? el('destination-account').value : null});
       if(version===generation) await poll(job.id,version);
-    } catch(error) { if(version===generation) fail(error); }
+    } catch(error) { jobStatus='failed';if(version===generation) fail(error); }
     finally {lock(false);}
   });
   chrome.storage.onChanged.addListener((changes,area)=>{if(area==='session' && Object.keys(changes).some(k=>k.startsWith('capture:'))) refresh();});
-  globalThis.ClatriTransfer={authChanged(value){signedIn=value;generation++;clearTimeout(timer);if(value) refresh();else {state=null;el('destination').hidden=true;el('transfer-skeleton').hidden=true;el('import-issues').replaceChildren();status('');}}};
+  globalThis.ClatriTransfer={authChanged(value){signedIn=value;generation++;clearTimeout(timer);if(value) refresh();else {state=null;jobStatus='none';sentKey=null;el('destination').hidden=true;el('transfer-skeleton').hidden=true;el('import-issues').replaceChildren();status('');}}};
 })();

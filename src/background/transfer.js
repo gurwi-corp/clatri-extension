@@ -72,7 +72,9 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
         const last = (await chrome.storage.local.get('extension-import:' + uid))['extension-import:' + uid];
         const context = await api('/context', session);
         const selection = capture ? (await chrome.storage.local.get('destination:'+uid+':'+capture.source_key))['destination:'+uid+':'+capture.source_key] : null;
-        return { ...context, selection, capture: capture ? { id:capture.id, product:capture.product, last4:capture.source_last4, coverage:capture.coverage, count:capture.items.length } : null, job: last?.job || null };
+        return { ...context, selection, capture: capture ? { id:capture.id, product:capture.product, last4:capture.source_last4, coverage:capture.coverage, count:capture.items.length } : null,
+          // Only the send made from these exact rows: an older import must not read as this one's result.
+          job: capture && last?.capture === capture.id ? last.job : null, sent: capture && last?.capture === capture.id ? last.destination : null };
       }
       if (message.type === 'transfer.status' && allowed(message,['type','id']) && /^[0-9a-f-]{36}$/.test(message.id)) return api('/imports/' + message.id,session);
       if (message.type === 'transfer.resolve' && allowed(message,['type','id','item_key','action','expected_version','target_event_id']) && /^[0-9a-f-]{36}$/.test(message.id) && text(message.item_key,128) && Number.isInteger(message.expected_version) && ['distinct','same_existing'].includes(message.action)) {
@@ -94,7 +96,7 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
         const sendId=sendHash.slice(0,8)+'-'+sendHash.slice(8,12)+'-4'+sendHash.slice(13,16)+'-8'+sendHash.slice(17,20)+'-'+sendHash.slice(20,32);
         const envelope = { schema_version:1, ...destination, institution:capture.institution, product:capture.product, capture_id:sendId, part_index:0, part_count:1, connector_version:chrome.runtime.getManifest().version, coverage:capture.coverage, items:capture.items };
         const job = await api('/imports',session,envelope);
-        await chrome.storage.local.set({ ['extension-import:' + uid]: {job:job.id}, ['destination:'+uid+':'+capture.source_key]:destination });
+        await chrome.storage.local.set({ ['extension-import:' + uid]: {job:job.id,capture:capture.id,destination}, ['destination:'+uid+':'+capture.source_key]:destination });
         return job;
       } finally { sending = false; }
     },

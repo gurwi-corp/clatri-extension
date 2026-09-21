@@ -76,3 +76,14 @@ test('destinations load before bank rows but an empty preparation cannot send',a
  await f.transfer.stage(capture(),7);
  assert.equal((await f.transfer.handle({type:'transfer.context'},7)).capture.count,1);
 });
+
+test('a job is reported only for the capture and destination it was sent from',async()=>{
+ const f=fixture();await f.transfer.stage(capture(),7);const {capture:c}=await f.transfer.handle({type:'transfer.context'},7);
+ assert.equal((await f.transfer.handle({type:'transfer.context'},7)).job,null);
+ await f.transfer.handle({type:'transfer.send',capture_id:c.id,entity_id:'entity',account_id:'account',card_id:null},7);
+ const sent=await f.transfer.handle({type:'transfer.context'},7);
+ assert.ok(sent.job);assert.equal(sent.sent.account_id,'account');
+ await f.transfer.stage(capture(),7); // reloading the rows is a new capture
+ const reloaded=await f.transfer.handle({type:'transfer.context'},7);
+ assert.equal(reloaded.job,null);assert.equal(reloaded.sent,null);
+});

@@ -406,7 +406,7 @@
   /** Each mode reports right under its own action; the folded one is not read out. */
   function showMessage(text, tone) {
     for (const id of ["msg", "sendMsg"]) {
-      el(id).textContent = text;
+      kit.say(el(id), text, ui.busy && tone !== "error");
       el(id).className = `msg${tone === "error" ? " error" : tone === "ok" ? " ok" : ""}`;
     }
   }
@@ -679,6 +679,7 @@
     ui.staging=false;
     if (!event.data.ok) {
       ui.prepareFailed=true;ui.stagedKey=null;
+      if(event.data.reason==='updated') {say(t("Clatri was updated. Reload this page to keep using it."), 'error');return;}
       if(loud) {say(t("The transactions could not be prepared. Reload the extension and the bank page, then retry."), 'error');return;}
     }
     render();

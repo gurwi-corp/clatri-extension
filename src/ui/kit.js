@@ -243,6 +243,13 @@
     .msg.ok { color: var(--c-ok); }
     .msg:empty { display: none; }
 
+    /* Trailing dots for work that is still running; they stand in for the "…". */
+    .dots { display: inline-flex; gap: 3px; margin-left: 4px; vertical-align: baseline; }
+    .dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .25; animation: kit-dot 1.2s ease-in-out infinite; }
+    .dots i:nth-child(2) { animation-delay: .16s; }
+    .dots i:nth-child(3) { animation-delay: .32s; }
+    @keyframes kit-dot { 0%, 60%, 100% { opacity: .25; transform: none; } 30% { opacity: 1; transform: translateY(-2px); } }
+
     .skeleton {
       display: block; height: var(--h-field); border-radius: var(--r-field);
       background: linear-gradient(90deg, var(--c-field) 25%, var(--c-field-hover) 50%, var(--c-field) 75%);
@@ -505,6 +512,26 @@
     }
   }
 
+  // --- progress text --------------------------------------------------------
+
+  /**
+   * Set a message. While `working`, its trailing ellipsis becomes animated dots,
+   * so text that stays the same for a while still reads as alive.
+   */
+  function say(node, text, working = false) {
+    const make = node.ownerDocument?.createElement?.bind(node.ownerDocument);
+    if (!working || !text || !make || !node.append) {
+      node.textContent = text;
+      return;
+    }
+    node.textContent = String(text).replace(/\s*(…|\.\.\.)\s*$/, "");
+    const dots = make("span");
+    dots.className = "dots";
+    dots.setAttribute("aria-hidden", "true");
+    dots.innerHTML = "<i></i><i></i><i></i>";
+    node.append(dots);
+  }
+
   // --- mount ----------------------------------------------------------------
 
   /** Extension pages get the rules on the document; the panel inlines `css` itself. */
@@ -526,6 +553,7 @@
     escapeHtml,
     mount,
     collapse,
+    say,
     picker: Object.freeze({ fill, wire, disable, setOpen, isOpen, closeOutside }),
   });
 })();

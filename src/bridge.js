@@ -8,6 +8,9 @@
   let captureAllowedUntil = 0;
   let preparation = Promise.resolve();
   let generation = 0;
+  // Reloading or updating the extension orphans this script: chrome.runtime
+  // throws from then on. Tell the panel once instead of failing in the console.
+  const alive = () => { try { return Boolean(chrome.runtime?.id); } catch { return false; } };
   const allowCapture = event => {
     if (!event.isTrusted || event.target?.id !== 'clatri-root') return;
     // A real click in the bank panel can stage evidence; it cannot submit it.
@@ -18,6 +21,10 @@
   document.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End','Enter',' '].includes(event.key))allowCapture(event);},true);
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
+    if(!alive()) {
+      if(['clatri-prepare-transfer','clatri-stage-transfer'].includes(event.data?.channel)) window.postMessage({channel:'clatri-transfer-staged',ok:false,reason:'updated'},location.origin);
+      return;
+    }
     if(event.data?.channel==='clatri-clear-transfer') {
       generation++;
       document.getElementById('clatri-root')?.shadowRoot?.getElementById('transfer-frame')?.remove();
