@@ -1,5 +1,5 @@
 (() => {
-  const {t}=globalThis.ClatriI18n;
+  const {t,locale}=globalThis.ClatriI18n;
   const kit=globalThis.ClatriKit;
   const el=id=>document.getElementById(id);
   let state=null, signedIn=false, busy=false, timer=null, generation=0;
@@ -69,6 +69,14 @@
     } catch(error) { if(version===generation) {el('transfer-skeleton').hidden=true;el('destination').hidden=true;el('capture-summary').textContent='';fail(error);} }
   }
 
+  // A booking date is a calendar day, so it is built from its parts: parsing
+  // the ISO string would shift it by the browser's UTC offset.
+  const formats=locale()==='es' ? 'es-CO' : 'en-US';
+  function day(iso) {
+    const [y,m,d]=String(iso || '').split('-').map(Number);
+    if(!y || !m || !d) return '';
+    return new Intl.DateTimeFormat(formats,{day:'numeric',month:'short',year:'numeric'}).format(new Date(y,m-1,d));
+  }
   async function poll(id,version=generation) {
     clearTimeout(timer);
     try {
