@@ -2,6 +2,14 @@
 (() => {
   "use strict";
   const spanish = {
+    "The selection changed during the request. Download again for the selected account and dates.": "La selección cambió durante la consulta. Descarga de nuevo para la cuenta y las fechas seleccionadas.",
+    "The bank did not complete the request and no transactions were recovered. Open the transactions in the bank and retry.": "El banco no completó la consulta y no se recuperaron movimientos. Abre los movimientos en el banco e inténtalo de nuevo.",
+    "Download recovered rows ({count}) · incomplete": "Descargar recuperados ({count}) · incompleto",
+    "We could not confirm that the bank returned every transaction. {count} transactions were recovered. You can retry or download only those rows as an incomplete file.": "No pudimos confirmar que el banco devolviera todos los movimientos. Se recuperaron {count}. Puedes reintentar o descargar solo esas filas en un archivo incompleto.",
+    "Incomplete file downloaded: {count} recovered transactions. Other transactions may be missing.": "Archivo incompleto descargado: {count} movimientos recuperados. Pueden faltar otros movimientos.",
+    "The file could not be downloaded. Please retry.": "No se pudo descargar el archivo. Inténtalo de nuevo.",
+    "Bank instructions": "Instrucciones del banco",
+    "In Sucursal Virtual Personas, open your account or card and view its transactions in the bank’s interface. Once they are visible, return to Clatri to download them or send them to your Clatri account. For accounts, set the dates in the bank’s search and search once before downloading.": "Dentro de la Sucursal Virtual Personas, abre tu cuenta o tarjeta y consulta sus movimientos en la interfaz del banco. Cuando puedas verlos, vuelve a Clatri para descargarlos o enviarlos a tu cuenta de Clatri. Para cuentas, configura las fechas en el buscador del banco y busca una vez antes de descargar.",
     "Checking your session…": "Comprobando tu sesión…",
     "Continue with Google": "Continuar con Google",
     "Continue with Apple": "Continuar con Apple",

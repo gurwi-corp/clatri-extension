@@ -14,14 +14,20 @@ release may differ: publishing code on GitHub does not update the store release.
 | Bancolombia | Checking account | Type recognized by the adapter; product-specific validation pending | Not confirmed for this product | Pending |
 
 **How to use it:** sign in to Bancolombia’s personal banking portal yourself,
-open **Tus productos**, then the account or card. Open Clatri’s floating panel,
-select the product and download or copy the available transactions.
+open **Tus productos**, then the account or card and its **Movimientos** screen.
+Wait until you can see the transactions. For accounts, set the dates and run the
+bank’s search once. Then open Clatri’s floating panel, select the product and
+download or copy the available transactions. Each adapter supplies its own
+instructions in the bank panel.
 
 **Current limitations:**
 
 - Your bank session must be active in the browser. Signing in to Clatri is
   separate and does not connect an institution by itself.
-- Incomplete captures cancel the export; no misleading partial file is created.
+- Incomplete captures never download automatically. You can explicitly download
+  recovered rows using the separate recovery button. The filename ends in
+  `-incomplete` and CSV/JSON includes `capture_complete: false`; other rows may
+  be missing. These captures are not eligible for automatic import.
 - The connector’s base currency is COP. Explicit transaction currencies from the
   bank are preserved. Historical FX and full original/billed amount reconciliation
   are not implemented yet.

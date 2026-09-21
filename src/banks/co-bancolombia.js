@@ -398,22 +398,32 @@
    * use it rather than walking until something breaks.
    */
   function isLastPage(json, page) {
-    const meta =
-      json &&
-      (json.meta ||
-        json.pagination ||
-        (json.data && (json.data.meta || json.data.pagination)));
-    if (!meta || typeof meta !== "object") return false;
-
-    const more = shape.valLike(meta, "flagmorerecords", "morerecords", "hasmore", "moredata");
-    if (more === false || more === 0 || more === "false" || more === "N" || more === "0") {
-      return true;
+    // A response can have tracing metadata AND a separate pagination block.
+    // Read all supported locations; never treat pageSize as a page count.
+    const blocks = [json?.meta, json?.pagination, json?.data?.meta, json?.data?.pagination]
+      .filter(value => value && typeof value === "object" && !Array.isArray(value));
+    const moreKeys = new Set(["flagmorerecords", "morerecords", "hasmore", "hasmorerecords", "moredata"]);
+    const countKeys = new Set(["pages", "totalpages", "pagecount"]);
+    const flags = [];
+    const counts = [];
+    for (const block of blocks) {
+      for (const [key, value] of Object.entries(block)) {
+        const name = key.toLowerCase();
+        if (moreKeys.has(name)) {
+          const flag = String(value).toLowerCase();
+          if (["true", "1", "y", "s"].includes(flag)) flags.push(true);
+          else if (["false", "0", "n"].includes(flag)) flags.push(false);
+        }
+        if (countKeys.has(name) && /^(?:[1-9]\d*)$/.test(String(value))) {
+          const count = Number(value);
+          if (Number.isSafeInteger(count)) counts.push(count);
+        }
+      }
     }
-
-    const pages = shape.num(shape.valLike(meta, "pages", "totalpages", "pagecount"));
-    if (pages !== null && pages > 0 && page >= pages) return true;
-
-    return false;
+    // Conflicting signals cannot prove completion. A promised next page wins.
+    if (flags.includes(true)) return false;
+    if (flags.includes(false)) return true;
+    return counts.length > 0 && counts.every(count => page >= count);
   }
 
   // --- per-request headers --------------------------------------------------
@@ -517,6 +527,7 @@
     country: "CO",
     name: "Bancolombia",
     currency: "COP",
+    instructions: "In Sucursal Virtual Personas, open your account or card and view its transactions in the bank’s interface. Once they are visible, return to Clatri to download them or send them to your Clatri account. For accounts, set the dates in the bank’s search and search once before downloading.",
 
     matchesHost: (host) => /(^|\.)bancolombia\.com$/i.test(host),
 

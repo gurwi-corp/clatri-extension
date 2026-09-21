@@ -49,9 +49,10 @@
 
   function toCsv(transactions, context) {
     const rows = toRows(transactions, context);
-    const lines = [COLUMNS.join(",")];
+    const columns = context.complete === false ? [...COLUMNS, "capture_complete"] : COLUMNS;
+    const lines = [columns.join(",")];
     for (const row of rows) {
-      lines.push(COLUMNS.map((column) => escapeCsv(row[column])).join(","));
+      lines.push(columns.map((column) => escapeCsv(column === "capture_complete" ? false : row[column])).join(","));
     }
     return lines.join("\r\n");
   }
@@ -66,6 +67,7 @@
         from: context.from,
         to: context.to,
         count: transactions.length,
+        ...(context.complete === false ? { capture_complete: false } : {}),
         transactions: toRows(transactions, context),
       },
       null,
@@ -77,7 +79,7 @@
     const slug = String(context.bank || "bank").toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const account = String(context.account || "").replace(/[^0-9a-zA-Z]/g, "");
     const tail = account ? `-${account}` : "";
-    return `${slug}${tail}-${context.from}_${context.to}.${extension}`;
+    return `${slug}${tail}-${context.from}_${context.to}${context.complete === false ? "-incomplete" : ""}.${extension}`;
   }
 
   function download(content, name, mime) {

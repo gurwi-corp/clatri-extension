@@ -654,6 +654,13 @@ fetchImpl = async (url, init) => {
 const fullPageFailure = await engine.fetchRange({ account, from: "2026-07-01", to: "2026-07-01" });
 ok("a generic error after a full page remains partial", fullPageFailure.truncated === true);
 
+// General response metadata must not hide the transaction pagination block.
+check("nested final-page flag survives general metadata", bank.isLastPage({ meta: { requestId: "fixture" }, data: { pagination: { hasMoreRecords: false } } }, 1), true);
+check("root pagination survives general metadata", bank.isLastPage({ meta: { requestId: "fixture" }, pagination: { flagMoreRecords: "N" } }, 1), true);
+check("pageSize is not a page count", bank.isLastPage({ pagination: { pageSize: 1 } }, 1), false);
+check("an explicit next page wins over a page-count estimate", bank.isLastPage({ pagination: { hasMoreRecords: true, pages: 1 } }, 1), false);
+check("conflicting more flags never declare completion", bank.isLastPage({ meta: { hasMoreRecords: false }, data: { pagination: { hasMoreRecords: true } } }, 1), false);
+
 // When the response says how many pages there are, believe it and stop early.
 fetchCalls = [];
 fetchImpl = async (url, init) => {
@@ -1175,6 +1182,11 @@ check(
 check("inflow direction from sign", lines[2].split(",")[3], "inflow");
 ok("rows written in the order given, oldest first", lines[1] < lines[2]);
 check("filename", exporter.filename(context, "csv"), "bancolombia-00000000000-2026-07-01_2026-07-31.csv");
+
+const incompleteContext = { ...context, complete: false };
+check("partial JSON carries explicit completeness", JSON.parse(exporter.toJson([], incompleteContext)).capture_complete, false);
+ok("partial JSON filename is marked", exporter.filename(incompleteContext, "json").endsWith("-incomplete.json"));
+ok("normal CSV schema remains unchanged", !exporter.toCsv([], context).includes("capture_complete"));
 
 // 10. debug report is safe to share -----------------------------------------
 console.log("\ndebug report");

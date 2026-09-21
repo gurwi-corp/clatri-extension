@@ -284,7 +284,7 @@ ok("the note goes away", byId.rangeNote.hidden === true);
 ok("there is no manual account entry", !("accountManual" in byId) && !("toggleManual" in byId));
 ok("the account field is our own picker, not a native select", byId.account.tagName === "div");
 
-console.log("\nit refuses a partial export");
+console.log("\npartial downloads require a separate explicit action");
 let downloads = 0;
 NS.exporter.download = () => {
   downloads += 1;
@@ -312,7 +312,21 @@ ok("busy action follows the browser language", (spanish ? /Procesando/ : /Workin
 ok("request status follows the browser language", (spanish ? /Consultando movimientos/ : /Requesting transactions/).test(byId.msg.textContent));
 await new Promise((resolve) => setTimeout(resolve, 0));
 check("no file is downloaded", downloads, 0);
-ok("the cancellation is explained", (spanish ? /exportación cancelada/i : /export cancelled/i).test(byId.msg.textContent), byId.msg.textContent);
+ok("incompleteness is explained", (spanish ? /no pudimos confirmar/i : /could not confirm/i).test(byId.msg.textContent), byId.msg.textContent);
+ok("recovered rows are offered explicitly", byId.downloadPartial.hidden === false);
+NS.exporter.download = (content, name) => { downloads += 1; sandbox.__partialDownload = { content, name }; };
+byId.downloadPartial.fire("click");
+await new Promise((resolve) => setTimeout(resolve, 0));
+check("explicit recovery downloads once", downloads, 1);
+ok("partial file is marked in its name", /-incomplete\.csv$/.test(sandbox.__partialDownload.name));
+ok("partial CSV carries machine-readable incompleteness", /capture_complete/.test(sandbox.__partialDownload.content) && /false/.test(sandbox.__partialDownload.content));
+byId.from.value = "2026-07-02";
+byId.from.fire("change");
+ok("changing the range hides stale partial data", byId.downloadPartial.hidden === true);
+byId.downloadPartial.fire("click");
+await new Promise((resolve) => setTimeout(resolve, 0));
+check("a stale partial action cannot download", downloads, 1);
+downloads = 0;
 
 console.log("\none download button, a format picker and a copy icon");
 ok("there is no separate JSON button", !("json" in byId));
@@ -348,6 +362,17 @@ await new Promise((resolve) => setTimeout(resolve, 0));
 ok("the copy icon reuses the rows without a new download", downloads === 1 && copied !== null);
 ok("and copies them in the chosen format", /"transactions"/.test(copied || ""));
 ok("says so", (spanish ? /copiados como JSON/ : /copied as JSON/).test(byId.msg.textContent), byId.msg.textContent);
+
+// Changes made while a request is pending must not relabel old account data.
+let finishRequest;
+NS.engine.fetchRange = () => new Promise(resolve => { finishRequest = resolve; });
+byId.run.fire("click");
+byId.to.value = "2026-07-04";
+byId.to.fire("change");
+finishRequest({ transactions: [{ date: "2026-07-03", description: "OLD", amount: 10 }], truncated: false });
+await new Promise(resolve => setTimeout(resolve, 0));
+check("no automatic download after selection changed mid-flight", downloads, 1);
+ok("a changed selection requires a new request", (spanish ? /selección cambió/ : /selection changed/).test(byId.msg.textContent));
 
 console.log(failures ? `\n${failures} failing check(s)\n` : "\nAll checks passed\n");
 process.exit(failures ? 1 : 0);

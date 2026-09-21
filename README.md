@@ -246,6 +246,9 @@ A bank page's two identical rows are kept as two occurrences. Retrying a split
 window replaces its parent rows instead of deduplicating by amount/date/text.
 Generic bank errors now leave a capture explicitly incomplete, even after a
 short page. Only explicit pagination/empty-page evidence completes a capture.
+An incomplete capture offers a separate explicit recovery download; its filename
+and CSV/JSON mark it as incomplete. It is never exported automatically or eligible
+for automatic import. Bank-specific instructions appear above the account picker.
 
 ### Interface language
 
