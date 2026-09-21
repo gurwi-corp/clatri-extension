@@ -46,7 +46,8 @@
       el('transfer-skeleton').hidden=true;
       el('destination').hidden=!state.capture;
       el('capture-summary').textContent=state.capture ? t('{count} transactions · ending {last4} · {from} to {to}',{count:state.capture.count,last4:state.capture.last4,from:state.capture.coverage.start,to:state.capture.coverage.end}) : t('In your bank, open your transactions and click “Send to Clatri”.');
-      if(state.capture && !state.capture.count) el('capture-summary').textContent=t('Load your bank transactions with the button above, then choose where to send them.');
+      // Nothing loaded yet: the bank panel says so next to its Load button.
+      if(state.capture && !state.capture.count) el('capture-summary').textContent='';
       if(state.capture?.count && !state.capture.coverage.complete) el('capture-summary').textContent+=' '+t('The bank did not confirm the end of the list. Only the received transactions will be sent.');
       const entityId=previous?.entity || state.selection?.entity_id;
       options(el('entity'),state.entities,state.entities.some(e=>e.id===entityId) ? entityId : '','Choose an entity','entity-label');

@@ -7,7 +7,7 @@
     "Transactions": "Movimientos",
     "Load transactions": "Cargar movimientos",
     "Reload transactions": "Volver a cargar movimientos",
-    "Load your bank transactions with the button above, then choose where to send them.": "Carga tus movimientos con el botón de arriba y elige a dónde enviarlos.",
+    "Load your transactions to send them to Clatri.": "Carga tus movimientos para enviarlos a Clatri.",
     "We couldn’t load your Clatri accounts. Try again in a moment.": "No pudimos cargar tus cuentas de Clatri. Inténtalo de nuevo en un momento.",
     "Loading your Clatri accounts…": "Cargando tus cuentas de Clatri…",
     "Credit card in Clatri": "Tarjeta de crédito en Clatri",

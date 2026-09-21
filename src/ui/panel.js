@@ -29,10 +29,13 @@
     from: firstOfMonth(),
     to: today(),
     busy: false,
-    mode: "download",
+    mode: "send",
     instructionsOpen: false,
     preparedKey: null,
     preparing: false,
+    prepareFailed: false,
+    prepareLoud: false,
+    staging: false,
     stagedKey: null,
     message: "",
     tone: "neutral",
@@ -172,13 +175,13 @@
 
           <div class="segmented" id="modeTabs" role="tablist" aria-label="${t("Transactions")}" data-index="0">
             <span class="segmented-thumb" aria-hidden="true"></span>
-            <button id="downloadTab" role="tab" aria-controls="downloadPanel" aria-selected="true">${kit.icons.download}<span>${t("Download")}</span></button>
-            <button id="sendTab" role="tab" aria-controls="sendPanel" aria-selected="false">${kit.icons.send}<span>${t("Send")}</span></button>
+            <button id="sendTab" role="tab" aria-controls="sendPanel" aria-selected="true">${kit.icons.send}<span>${t("Send")}</span></button>
+            <button id="downloadTab" role="tab" aria-controls="downloadPanel" aria-selected="false">${kit.icons.download}<span>${t("Download")}</span></button>
           </div>
 
           <!-- Both modes stay in the tree so switching animates their height. -->
           <div>
-            <div class="collapse" id="downloadPanel" role="tabpanel" aria-labelledby="downloadTab" data-open="true" data-settled="true">
+            <div class="collapse" id="downloadPanel" role="tabpanel" aria-labelledby="downloadTab" data-open="false">
               <div class="collapse-inner stack">
                 <div>
                   <span class="label" id="formatLabel">${t("Format")}</span>
@@ -192,7 +195,7 @@
                 <button class="ghost" id="downloadPartial" hidden></button>
               </div>
             </div>
-            <div class="collapse" id="sendPanel" role="tabpanel" aria-labelledby="sendTab" data-open="false">
+            <div class="collapse" id="sendPanel" role="tabpanel" aria-labelledby="sendTab" data-open="true" data-settled="true">
               <div class="collapse-inner stack">
                 <button class="primary" id="sendClatri">${t("Load transactions")}</button>
                 <p class="msg" id="sendMsg" aria-live="polite"></p>
@@ -282,8 +285,9 @@
   let previousSelection = null;
   function render() {
     const selection=exportKey(selectedAccount());
-    if(previousSelection!==null && previousSelection!==selection) {ui.preparedKey=null;ui.preparing=false;ui.stagedKey=null;window.postMessage({channel:'clatri-clear-transfer'},location.origin);}
+    if(previousSelection!==null && previousSelection!==selection) {ui.preparedKey=null;ui.preparing=false;ui.prepareFailed=false;ui.stagedKey=null;window.postMessage({channel:'clatri-clear-transfer'},location.origin);}
     previousSelection=selection;
+    ensurePrepared();
     try {
       paint();
     } catch (error) {
@@ -395,6 +399,8 @@
     el("downloadPartial").textContent = t("Download recovered rows ({count}) · incomplete", { count: ui.partial?.transactions.length || 0 });
 
     showMessage(ui.message, ui.tone);
+    // Say what Load is for only while nothing else is being said.
+    if (!ui.message && !ui.busy && !staged) el("sendMsg").textContent = t("Load your transactions to send them to Clatri.");
   }
 
   /** Each mode reports right under its own action; the folded one is not read out. */
@@ -428,7 +434,7 @@
     };
   }
 
-  const MODES = ["download", "send"];
+  const MODES = ["send", "download"];
   const FORMATS = [
     { id: "csv", label: "CSV", mime: "text/csv", serialize: (rows, context) => exporter.toCsv(rows, context) },
     { id: "json", label: "JSON", mime: "application/json", serialize: (rows, context) => exporter.toJson(rows, context) },
@@ -513,6 +519,7 @@
           status:row.bankType === 'PENDIENTE' ? 'pending' : 'completed', timezone:'America/Bogota',
         }));
         ui.stagedKey = requestKey;
+        ui.staging = true;
         window.postMessage({channel:'clatri-stage-transfer',capture:{institution:'co-bancolombia',product:account.kind === 'card' ? 'card' : 'deposit',number:account.number,from:locked ? covered.from : ui.from,to:locked ? covered.to : ui.to,complete:!truncated,items}},location.origin);
         say(t("Choose the destination below to send your transactions."));
         return;
@@ -596,6 +603,14 @@
   ["country", "bank", "account", "format"].forEach((id) => kit.picker.wire(el(id), { boundary: scroller }));
   // Clicks inside a shadow root are retargeted at the document; listen here too.
   root.addEventListener("click", kit.picker.closeOutside);
+  // The bridge only stages after a real click in the panel, so a quiet failure
+  // gets another go on the next one.
+  root.addEventListener("click", () => {
+    if (ui.prepareFailed) {
+      ensurePrepared({ retry: true });
+      render();
+    }
+  });
 
   el("bankInstructionsToggle").addEventListener("click", () => {
     ui.instructionsOpen = !ui.instructionsOpen;
@@ -658,25 +673,35 @@
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin || event.data?.channel !== 'clatri-transfer-staged') return;
     ui.preparing=false;
-    if (!event.data.ok) {ui.preparedKey=null;ui.stagedKey=null;say(t("The transactions could not be prepared. Reload the extension and the bank page, then retry."), 'error');}
-    else render();
+    // A preparation nobody asked for (the panel opening on Send, a new account
+    // appearing) fails quietly; the Send tab or Load retries it out loud.
+    const loud=ui.prepareLoud || ui.staging;
+    ui.staging=false;
+    if (!event.data.ok) {
+      ui.prepareFailed=true;ui.stagedKey=null;
+      if(loud) {say(t("The transactions could not be prepared. Reload the extension and the bank page, then retry."), 'error');return;}
+    }
+    render();
   });
+  /** Ask the extension for the destination frame that matches the current selection. */
+  function ensurePrepared({explicit=false,retry=explicit}={}) {
+    const account=selectedAccount();
+    if(ui.mode!=='send' || !account || (!explicit && !ui.open)) return;
+    const key=exportKey(account);
+    if(ui.preparedKey===key && !(retry && ui.prepareFailed)) return;
+    ui.preparedKey=key;ui.prepareFailed=false;ui.prepareLoud=explicit;ui.preparing=true;
+    window.postMessage({channel:'clatri-prepare-transfer',capture:{institution:'co-bancolombia',product:account.kind==='card'?'card':'deposit',number:account.number,from:ui.from,to:ui.to}},location.origin);
+  }
   function selectMode(mode) {
     ui.mode=mode;
+    ensurePrepared({explicit:true});
     render();
-    if(mode==='send' && selectedAccount() && ui.preparedKey!==exportKey(selectedAccount())) {
-      ui.preparedKey=exportKey(selectedAccount());
-      ui.preparing=true;
-      render();
-      const account=selectedAccount();
-      window.postMessage({channel:'clatri-prepare-transfer',capture:{institution:'co-bancolombia',product:account.kind==='card'?'card':'deposit',number:account.number,from:ui.from,to:ui.to}},location.origin);
-    }
   }
   for (const mode of MODES) {
     el(mode+'Tab').addEventListener('click',()=>selectMode(mode));
     el(mode+'Tab').addEventListener('keydown',event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-      event.preventDefault();const next=event.key==='Home'?'download':event.key==='End'?'send':mode==='download'?'send':'download';
+      event.preventDefault();const next=event.key==='Home'?MODES[0]:event.key==='End'?MODES[MODES.length-1]:MODES[(MODES.indexOf(mode)+(event.key==='ArrowRight'?1:MODES.length-1))%MODES.length];
       selectMode(next);el(next+'Tab').focus();
     });
   }
