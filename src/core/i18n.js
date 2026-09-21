@@ -17,7 +17,6 @@
     "Verify": "Verificar",
     "Sign out": "Cerrar sesión",
     "Check again": "Volver a comprobar",
-    "Your banking session stays with your bank.": "Tu sesión bancaria permanece en el banco.",
     "Sign-in was closed. You can try again.": "Se cerró el acceso. Puedes volver a intentarlo.",
     "We couldn’t complete sign-in. Please try again.": "No se pudo completar el acceso. Inténtalo de nuevo.",
     "The provider is unavailable. Please try again later.": "El proveedor no está disponible. Inténtalo de nuevo más tarde.",
