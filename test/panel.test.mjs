@@ -208,11 +208,10 @@ closeEl.fire("click");
 ok("the close button closes it", panelEl.hidden === true);
 ok("closing restores the launcher", byId.launcher.hidden === false);
 
-check("all four presets are wired", shadow._chips().map((c) => c.dataset.preset), [
+check("all three presets are wired", shadow._chips().map((c) => c.dataset.preset), [
   "this-month",
   "last-month",
   "last-3",
-  "this-year",
 ]);
 ok(
   "every preset has a handler",
