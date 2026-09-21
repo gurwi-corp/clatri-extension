@@ -2,6 +2,11 @@
 (() => {
   "use strict";
   const spanish = {
+    "Download": "Descargar",
+    "Send": "Enviar",
+    "Transactions": "Movimientos",
+    "Load transactions": "Cargar movimientos",
+    "Choose a destination, then load the bank transactions below.": "Selecciona el destino y pulsa Cargar movimientos aquí abajo.",
     "We couldn’t load your Clatri accounts. Try again in a moment.": "No pudimos cargar tus cuentas de Clatri. Inténtalo de nuevo en un momento.",
     "Loading your Clatri accounts…": "Cargando tus cuentas de Clatri…",
     "Credit card in Clatri": "Tarjeta de crédito en Clatri",

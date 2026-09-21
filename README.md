@@ -248,9 +248,9 @@ Spanish regional variants use Spanish; English and other languages use English.
 Reload the extension and the bank tab after changing the browser language.
 Bank descriptions, transaction data and CSV/JSON field names keep their original format.
 
-## Send to Clatri (0.13.0)
+## Send to Clatri (0.13.1)
 
-In the bank panel, choose the source account/card and period, then **Send to Clatri**.
+In the bank panel, choose the source account/card and period, then select the **Send** tab. Choose your Clatri entity and bank account or credit card, click **Load transactions**, and confirm with **Send to Clatri**. The **Download** tab keeps CSV/JSON export separate. Destinations load before any bank transaction request.
 The destination form appears inside that same panel. Choose your Clatri entity,
 then a bank account for deposit movements or an existing credit card for card
 movements. Confirm the send; its result appears there. Your last destination is

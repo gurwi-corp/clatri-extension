@@ -33,8 +33,11 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (isBankSender(sender, chrome.runtime)) {
     if (message?.type === 'bank.clear') { bankFrames.clear(sender.tab.id).then(()=>reply({ok:true})); return true; }
     if (message?.type === 'bank.event' && ['card','deposit'].includes(message.product)) {transfer.usage('csv_generated',message.product);reply({ok:true});return false;}
+    if (message?.type === 'bank.prepare') {
+      (async()=>{try {await transfer.prepare(message.capture,sender.tab.id);const url=await bankFrames.grant(sender.tab.id);reply({ok:true,url});}catch{reply({ok:false});}})();return true;
+    }
     if (message?.type === 'bank.stage') {
-      (async()=>{try {await transfer.stage(message.capture,sender.tab.id);const url=await bankFrames.grant(sender.tab.id);reply({ok:true,url});transfer.usage('bank_used',message.capture.product);}catch{reply({ok:false});}})(); return true;
+      (async()=>{try {await transfer.stage(message.capture,sender.tab.id);reply({ok:true});transfer.usage('bank_used',message.capture.product);}catch{reply({ok:false});}})(); return true;
     }
     return false;
   }

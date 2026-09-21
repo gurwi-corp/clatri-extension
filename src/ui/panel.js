@@ -28,6 +28,8 @@
     from: firstOfMonth(),
     to: today(),
     busy: false,
+    mode: "download",
+    preparedKey: null,
     message: "",
     tone: "neutral",
     format: "csv",
@@ -168,6 +170,11 @@
       .primary:hover { background: #303030; }
       .primary:disabled { background: #dcdee1; color: #fff; cursor: not-allowed; }
 
+      .mode-tabs { display:flex; gap:4px; padding:4px; border:1px solid #7775; border-radius:12px; }
+      .mode-tabs button { flex:1; padding:10px; border:0; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
+      .mode-tabs [aria-selected="true"] { background:#7431ff; color:white; }
+      [role="tabpanel"] { display:grid; gap:14px; }
+      [hidden] { display:none !important; }
       .actions { display: flex; gap: 8px; }
       .actions .primary { flex: 1; }
       .icon {
@@ -284,13 +291,20 @@
             <button class="chip" data-preset="last-3">${t("Last 3 months")}</button>
           </div>
 
+          <div class="mode-tabs" role="tablist" aria-label="${t("Transactions")}">
+            <button id="downloadTab" role="tab" aria-controls="downloadPanel" aria-selected="true">${t("Download")}</button>
+            <button id="sendTab" role="tab" aria-controls="sendPanel" aria-selected="false">${t("Send")}</button>
+          </div>
+          <div id="sendPanel" role="tabpanel" aria-labelledby="sendTab" hidden>
+            <div id="transfer-slot"></div>
+            <button class="ghost" id="sendClatri">${t("Load transactions")}</button>
+          </div>
+          <div id="downloadPanel" role="tabpanel" aria-labelledby="downloadTab">
           <div>
             <span class="label">${t("Format")}</span>
             <div class="picker" id="format" aria-expanded="false"></div>
           </div>
 
-          <button class="primary" id="sendClatri">${t("Send to Clatri")}</button>
-          <div id="transfer-slot"></div>
           <div class="actions">
             <button class="primary" id="run">${t("Download CSV")}</button>
             <button class="icon" id="copy" title="${t("Copy to clipboard")}" aria-label="${t("Copy to clipboard")}">
@@ -301,6 +315,7 @@
             </button>
           </div>
 
+          </div>
           <p class="msg" id="msg" aria-live="polite"></p>
           <button class="ghost" id="downloadPartial" hidden></button>
 
@@ -503,7 +518,7 @@
   let previousSelection = null;
   function render() {
     const selection=exportKey(selectedAccount());
-    if(previousSelection!==null && previousSelection!==selection) window.postMessage({channel:'clatri-clear-transfer'},location.origin);
+    if(previousSelection!==null && previousSelection!==selection) {ui.preparedKey=null;window.postMessage({channel:'clatri-clear-transfer'},location.origin);}
     previousSelection=selection;
     try {
       paint();
@@ -599,6 +614,13 @@
     el("downloadPartial").hidden = !ui.partial || ui.busy;
     el("downloadPartial").disabled = ui.busy;
     el("sendClatri").disabled = ui.busy || !selectedAccount();
+    el("sendClatri").textContent = t(ui.busy ? "Requesting transactions…" : "Load transactions");
+    el("downloadPanel").hidden = ui.mode !== "download";
+    el("sendPanel").hidden = ui.mode !== "send";
+    for (const mode of ["download", "send"]) {
+      el(mode+"Tab").setAttribute("aria-selected", String(ui.mode === mode));
+      el(mode+"Tab").tabIndex = ui.mode === mode ? 0 : -1;
+    }
     el("downloadPartial").textContent = t("Download recovered rows ({count}) · incomplete", { count: ui.partial?.transactions.length || 0 });
 
     const message = el("msg");
@@ -672,6 +694,7 @@
       return;
     }
 
+    if(mode==='send') selectMode('send');
     const requestKey = exportKey(account);
     ui.busy = true;
     ui.partial = null;
@@ -848,8 +871,25 @@
 
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin || event.data?.channel !== 'clatri-transfer-staged') return;
-    if (!event.data.ok) say(t("The transactions could not be prepared. Reload the extension and the bank page, then retry."), 'error');
+    if (!event.data.ok) {ui.preparedKey=null;say(t("The transactions could not be prepared. Reload the extension and the bank page, then retry."), 'error');}
   });
+  function selectMode(mode) {
+    ui.mode=mode;
+    render();
+    if(mode==='send' && selectedAccount() && ui.preparedKey!==exportKey(selectedAccount())) {
+      ui.preparedKey=exportKey(selectedAccount());
+      const account=selectedAccount();
+      window.postMessage({channel:'clatri-prepare-transfer',capture:{institution:'co-bancolombia',product:account.kind==='card'?'card':'deposit',number:account.number,from:ui.from,to:ui.to}},location.origin);
+    }
+  }
+  for (const mode of ['download','send']) {
+    el(mode+'Tab').addEventListener('click',()=>selectMode(mode));
+    el(mode+'Tab').addEventListener('keydown',event=>{
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      event.preventDefault();const next=event.key==='Home'?'download':event.key==='End'?'send':mode==='download'?'send':'download';
+      selectMode(next);el(next+'Tab').focus();
+    });
+  }
   el("sendClatri").addEventListener('click', () => run('send'));
   el("run").addEventListener("click", () => run("download"));
   el("copy").addEventListener("click", () => run("copy"));
