@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const suites = ["logic.test.mjs", "panel.test.mjs", "auth.test.mjs", "auth-sdk.test.mjs", "i18n.test.mjs"];
+const suites = ["logic.test.mjs", "panel.test.mjs", "auth.test.mjs", "auth-sdk.test.mjs", "transfer.test.mjs", "i18n.test.mjs"];
 
 let failed = 0;
 for (const suite of suites) {

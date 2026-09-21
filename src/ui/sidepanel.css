@@ -244,3 +244,13 @@ summary:focus-visible {
 .intro a:hover {
   color: #7431ff;
 }
+
+.transfer {margin:24px 0;padding:20px 0;border-top:1px solid #eceef0;border-bottom:1px solid #eceef0;}
+.transfer p {font-size:13px;line-height:1.6;}
+.transfer select {width:100%;min-width:0;padding:12px;border:1px solid #d5d8dd;border-radius:10px;background:#fff;color:#1a1a1a;font:inherit;margin-bottom:12px;}
+.transfer ul {padding-left:18px;font-size:12px;line-height:1.6;}
+.transfer li+li {margin-top:8px;}
+select:focus-visible {outline:3px solid #7431ff;outline-offset:3px;}
+
+.issue-actions {display:grid;gap:4px;margin-top:4px;}
+.issue-actions .text-button {margin-top:0;}

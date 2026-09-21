@@ -146,6 +146,19 @@
    * `direction` from the sign, so card amounts are flipped: a purchase is money
    * going out, an "abono" is money coming in.
    */
+  function exactAmount(value) {
+    if (typeof value !== 'number' && typeof value !== 'string') return null;
+    let text = String(value).replace(/[^0-9,.-]/g,'');
+    if (text.lastIndexOf(',') > text.lastIndexOf('.')) text = text.replace(/\./g,'').replace(',','.');
+    else text = text.replace(/,/g,'');
+    text = text.replace(/^-/, '');
+    if (!/^[0-9]{1,16}(?:\.[0-9]{1,8})?$/.test(text)) return null;
+    // A JSON number has already crossed a floating-point boundary. Refuse
+    // unsafe precision instead of pretending to recover the original cents.
+    if (typeof value === 'number' && (String(value).includes('e') || text.replace(/^0+|\./g,'').length > 15)) return null;
+    return text;
+  }
+
   function parseTransactions(json) {
     const rows = shape.findArray(
       json,
@@ -164,16 +177,15 @@
             shape.valLike(row, "description", "descripcion", "concept") ?? ""
           ).trim(),
           amount,
+          exactAmount: exactAmount(shape.valLike(row, "amount", "valor", "value")),
+          currency: String(shape.valLike(row, "currency", "moneda") ?? "").trim().toUpperCase() || undefined,
           bankType: isCard
             ? posted === false || posted === "false"
               ? "PENDIENTE"
               : ""
             : String(shape.valLike(row, "type", "tipo") ?? "").trim(),
-          reference: String(
-            (isCard
-              ? shape.valLike(row, "id", "authorizationcode")
-              : shape.valLike(row, "reference1", "reference", "referencia")) ?? ""
-          ).trim(),
+          reference: (isCard ? ['id','authorizationcode'] : ['reference1','reference','referencia'])
+            .map(key => shape.valLike(row,key)).filter(value => value != null && String(value).trim() && String(value).trim() !== 'null').map(String)[0]?.trim() || '',
         };
       })
       .filter((tx) => tx.date && tx.amount !== null);
@@ -397,7 +409,7 @@
    * `pagination` block carrying `hasMoreRecords`, so when either is there we
    * use it rather than walking until something breaks.
    */
-  function isLastPage(json, page) {
+  function paginationState(json, page) {
     // A response can have tracing metadata AND a separate pagination block.
     // Read all supported locations; never treat pageSize as a page count.
     const blocks = [json?.meta, json?.pagination, json?.data?.meta, json?.data?.pagination]
@@ -421,10 +433,13 @@
       }
     }
     // Conflicting signals cannot prove completion. A promised next page wins.
-    if (flags.includes(true)) return false;
-    if (flags.includes(false)) return true;
-    return counts.length > 0 && counts.every(count => page >= count);
+    if (flags.includes(true)) return "more";
+    if (flags.includes(false)) return "last";
+    return counts.length ? (counts.every(count => page >= count) ? "last" : "more") : "unknown";
   }
+
+  const isLastPage = (json, page) => paginationState(json, page) === "last";
+  const hasNextPage = (json, page) => paginationState(json, page) === "more";
 
   // --- per-request headers --------------------------------------------------
 
@@ -549,6 +564,7 @@
     maxWindowDays: 7,
     requireRangeApplied: true,
     isLastPage,
+    hasNextPage,
 
     parseAccounts,
     parseTransactions,

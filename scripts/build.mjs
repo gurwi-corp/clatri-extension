@@ -15,7 +15,7 @@ for (const path of ['src', 'icons', '_locales', 'sidepanel.html']) await cp(reso
 // Build the worker with dependencies bundled locally. Never load remote code.
 await build({ entryPoints: [resolve(root, 'src/background/service-worker.js')], outfile: resolve(out, 'src/background/service-worker.js'), bundle: true, format: 'esm', platform: 'browser', target: 'chrome116', minify: false });
 const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
-manifest.host_permissions = [`${origin.origin}/*`];
+manifest.host_permissions = [`${origin.origin}/*`, `${new URL(config.apiBase).origin}/*`];
 if (!process.argv.includes('--store')) {
   const dev = JSON.parse(await readFile(resolve(root, 'config/development-key.json'), 'utf8'));
   manifest.key = dev.publicKey;

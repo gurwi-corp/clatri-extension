@@ -49,10 +49,10 @@
 
   function toCsv(transactions, context) {
     const rows = toRows(transactions, context);
-    const columns = context.complete === false ? [...COLUMNS, "capture_complete"] : COLUMNS;
+    const columns = context.complete === false ? [...COLUMNS, "capture_complete"] : context.completion === "unknown" ? [...COLUMNS, "capture_status"] : COLUMNS;
     const lines = [columns.join(",")];
     for (const row of rows) {
-      lines.push(columns.map((column) => escapeCsv(column === "capture_complete" ? false : row[column])).join(","));
+      lines.push(columns.map((column) => escapeCsv(column === "capture_complete" ? false : column === "capture_status" ? "unknown" : row[column])).join(","));
     }
     return lines.join("\r\n");
   }
@@ -67,7 +67,7 @@
         from: context.from,
         to: context.to,
         count: transactions.length,
-        ...(context.complete === false ? { capture_complete: false } : {}),
+        ...(context.complete === false ? { capture_complete: false } : context.completion === "unknown" ? { capture_complete: null, capture_status: "unknown" } : {}),
         transactions: toRows(transactions, context),
       },
       null,
