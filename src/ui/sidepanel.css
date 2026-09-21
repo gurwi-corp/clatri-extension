@@ -321,7 +321,7 @@ button {
   text-underline-offset: 3px;
 }
 
-/* Movements that need a decision: one card each, bank row first. */
+/* Movements Clatri could not settle alone: one read-only card each. */
 #import-issues {
   list-style: none;
   margin: 0;
@@ -362,20 +362,6 @@ button {
   font-size: 12px;
   line-height: 1.5;
   color: var(--c-ink-2);
-}
-.issue .label {
-  margin: 0 0 -4px;
-}
-.issue-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.small {
-  width: auto;
-  min-height: 30px;
-  padding: 4px 11px;
-  font-size: 12px;
 }
 
 .frame-footer {

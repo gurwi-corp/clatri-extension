@@ -6,7 +6,7 @@
   // The import made from the rows on screen: 'none' | 'pending' | 'completed' | 'failed', and where it went.
   let jobStatus='none', sentKey=null;
   const errors={auth_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.',sign_in_required:'Sign in again to continue.',capture_changed:'The bank selection changed. Refresh before sending.',destination_conflict:'This bank account is already linked to another destination in this entity.',import_busy:'Another import is in progress. Try again shortly.',import_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.'};
-  const reasons={possible_duplicate:'Possible duplicate; no extra movement created.',historical_fx_unavailable:'Historical exchange rate unavailable.',card_payment_or_refund:'Card payment or refund requires identification.',bank_status_not_completed:'Not yet completed at the bank.'};
+  const reasons={historical_fx_unavailable:'Historical exchange rate unavailable.',card_payment_or_refund:'Card payment or refund requires identification.',bank_status_not_completed:'Not yet completed at the bank.'};
   async function message(type, data={}) {
     const response=await chrome.runtime.sendMessage({type,...data});
     if (!response?.ok) throw new Error(response?.error || 'import_unavailable');
@@ -78,10 +78,6 @@
     if(!y || !m || !d) return '';
     return new Intl.DateTimeFormat(formats,{day:'numeric',month:'short',year:'numeric'}).format(new Date(y,m-1,d));
   }
-  function moment(timestamp) {
-    const date=new Date(timestamp);
-    return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(formats,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}).format(date);
-  }
   function amount(item) {
     if(item.amount==null || !item.currency) return '';
     try { return (item.direction==='outgoing' ? '−' : '+')+new Intl.NumberFormat(formats,{style:'currency',currency:item.currency,maximumFractionDigits:2}).format(Number(item.amount)); }
@@ -89,42 +85,15 @@
   }
   const node=(tag,className,text)=>{const made=document.createElement(tag);if(className) made.className=className;if(text!=null) made.textContent=text;return made;};
 
-  /** One card per movement that needs a decision: the bank row, why it stopped, and what it may duplicate. */
-  function issueRow(job,item,version) {
+  /**
+   * What Clatri could not settle on its own, for information only. A bank row
+   * that matches an existing movement is linked by the server; anything left is
+   * reviewed in Clatri, with the rest of the account in view, not in a bank tab.
+   */
+  function issueRow(item) {
     const li=node('li','issue');
     const head=node('div','issue-head');head.append(node('span','issue-title',item.description),node('span','issue-amount',amount(item)));
-    const why=t(reasons[item.reason] || 'This transaction needs attention.');
-    li.append(head,node('p','issue-meta',[day(item.booking_date),why].filter(Boolean).join(' · ')));
-    if(item.reason!=='possible_duplicate') return li;
-
-    const candidates=item.candidates || [];
-    // The usual case is a single match; it starts selected so one click settles it.
-    let chosen=candidates.length===1 ? candidates[0].id : '';
-    const distinct=node('button','ghost small',t('Record as a separate transaction'));
-    const link=node('button','ghost small',t('Already in Clatri'));link.disabled=!chosen;
-    if(candidates.length) {
-      li.append(node('p','label',t('Same date and amount as one you already have:')));
-      const group=node('div','choices');group.setAttribute('role','radiogroup');group.setAttribute('aria-label',t('Existing transaction'));
-      for(const candidate of candidates) {
-        const option=node('button','choice');option.type='button';option.setAttribute('role','radio');option.setAttribute('aria-checked',String(candidate.id===chosen));
-        option.append(node('span','choice-mark'),node('span','text',candidate.description || t('No description')),node('span','hint',moment(candidate.occurred_at)));
-        option.addEventListener('click',()=>{
-          chosen=candidate.id;link.disabled=false;
-          for(const other of group.children) other.setAttribute('aria-checked',String(other===option));
-        });
-        group.append(option);
-      }
-      li.append(group);
-    }
-    const actions=node('div','issue-actions');
-    if(candidates.length) actions.append(link);
-    actions.append(distinct);li.append(actions);
-    async function resolve(action) {
-      distinct.disabled=true;link.disabled=true;
-      try {await message('transfer.resolve',{id:job.id,item_key:item.item_key,expected_version:item.version,action,target_event_id:action==='same_existing' ? chosen : null});await poll(job.id,version);}
-      catch {status(t('The transaction changed. Refresh its status before retrying.'),'error');}
-    }
-    distinct.addEventListener('click',()=>resolve('distinct'));link.addEventListener('click',()=>resolve('same_existing'));
+    li.append(head,node('p','issue-meta',[day(item.booking_date),t(reasons[item.reason] || 'This transaction needs attention.')].filter(Boolean).join(' · ')));
     return li;
   }
   async function poll(id,version=generation) {
@@ -133,15 +102,17 @@
       const job=await message('transfer.status',{id});
       if(!signedIn || version!==generation) return;
       el('import-issues').replaceChildren();
+      el('review-in-clatri').hidden=!(job.status==='completed' && job.result?.issues);
       jobStatus=job.status==='completed' ? 'completed' : ['failed','cancelled'].includes(job.status) ? 'failed' : 'pending';
       syncSend();
       if(job.status==='completed') {
-        // Only what happened: a clean import is one short line, not three counts.
+        // Only what happened: a clean import is one short line, not four counts.
         const counts=[t('{count} imported',{count:job.result.created || 0})];
-        if(job.result.issues) counts.push(t('{count} need attention',{count:job.result.issues}));
+        if(job.result.linked) counts.push(t('{count} already in Clatri',{count:job.result.linked}));
+        if(job.result.issues) counts.push(t('{count} to review in Clatri',{count:job.result.issues}));
         if(job.result.pending) counts.push(t('{count} pending at the bank',{count:job.result.pending}));
         status(counts.join(' · '),job.result.issues ? '' : 'ok');
-        for(const item of job.items || []) if(item.outcome==='issue' || item.outcome==='pending') el('import-issues').append(issueRow(job,item,version));
+        for(const item of job.items || []) if(item.outcome==='issue' || item.outcome==='pending') el('import-issues').append(issueRow(item));
         if(job.result.classification?.startsWith('unclassified')) status(el('transfer-status').textContent+' '+t('Automatic categorization was unavailable.'),'ok');
       } else if(['failed','cancelled'].includes(job.status)) status(t('The import could not be completed.'),'error');
       else { status(t('Received by Clatri. Processing transactions…'),'working');timer=setTimeout(()=>poll(id,version),2500); }
@@ -167,5 +138,5 @@
     finally {lock(false);}
   });
   chrome.storage.onChanged.addListener((changes,area)=>{if(area==='session' && Object.keys(changes).some(k=>k.startsWith('capture:'))) refresh();});
-  globalThis.ClatriTransfer={authChanged(value){signedIn=value;generation++;clearTimeout(timer);if(value) refresh();else {state=null;jobStatus='none';sentKey=null;el('destination').hidden=true;el('transfer-skeleton').hidden=true;el('import-issues').replaceChildren();status('');}}};
+  globalThis.ClatriTransfer={authChanged(value){signedIn=value;generation++;clearTimeout(timer);if(value) refresh();else {state=null;jobStatus='none';sentKey=null;el('review-in-clatri').hidden=true;el('destination').hidden=true;el('transfer-skeleton').hidden=true;el('import-issues').replaceChildren();status('');}}};
 })();
