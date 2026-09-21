@@ -5,8 +5,8 @@ export const isBankSender = (sender, runtime) => {
 const allowed = (object, keys) => object && typeof object === 'object' && !Array.isArray(object) && Object.keys(object).every(k => keys.includes(k));
 const text = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
 const iso = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10) === v;
-export function validateCapture(value) {
-  if (!allowed(value, ['institution','product','number','from','to','complete','items']) || value.institution !== 'co-bancolombia' || !['deposit','card'].includes(value.product) || !text(value.number,64) || !/^[0-9 *xX-]+$/.test(value.number) || !iso(value.from) || !iso(value.to) || value.from > value.to || typeof value.complete !== 'boolean' || !Array.isArray(value.items) || value.items.length < 1 || value.items.length > 500) throw new Error('invalid_capture');
+export function validateCapture(value, allowEmpty = false) {
+  if (!allowed(value, ['institution','product','number','from','to','complete','items']) || value.institution !== 'co-bancolombia' || !['deposit','card'].includes(value.product) || !text(value.number,64) || !/^[0-9 *xX-]+$/.test(value.number) || !iso(value.from) || !iso(value.to) || value.from > value.to || typeof value.complete !== 'boolean' || !Array.isArray(value.items) || (!allowEmpty && value.items.length < 1) || value.items.length > 500) throw new Error('invalid_capture');
   for (const row of value.items) {
     if (!allowed(row,['booking_date','description','reference','original_amount','original_currency','direction','status','timezone']) || !iso(row.booking_date) || row.booking_date < value.from || row.booking_date > value.to || !text(row.description,2048) || typeof row.original_amount !== 'string' || !/^[0-9]{1,16}(?:\.[0-9]{1,8})?$/.test(row.original_amount) || Number(row.original_amount) <= 0 || !/^[A-Z]{3}$/.test(row.original_currency) || !['incoming','outgoing'].includes(row.direction) || !['pending','completed'].includes(row.status) || (row.reference != null && (typeof row.reference !== 'string' || row.reference.length > 256)) || row.timezone !== 'America/Bogota') throw new Error('invalid_capture');
   }
@@ -51,8 +51,12 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
         if(action!=='csv_generated') await chrome.storage.local.set({[key]:true});
       } catch {} // telemetry never blocks sign-in or export
     },
-    async stage(payload, tabId) {
-      const value = validateCapture(payload);
+    async prepare(selection, tabId) {
+      if (!allowed(selection,['institution','product','number','from','to'])) throw new Error('invalid_capture');
+      return this.stage({...selection,complete:false,items:[]},tabId,true);
+    },
+    async stage(payload, tabId, allowEmpty = false) {
+      const value = validateCapture(payload, allowEmpty);
       const last4 = value.number.replace(/[^0-9]/g,'').slice(-4);
       if (!/^[0-9]{4}$/.test(last4)) throw new Error('invalid_capture');
       const sourceKey = await digest(value.institution + ':' + value.product + ':' + value.number.replace(/[ -]/g,''));
@@ -78,7 +82,7 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
       sending = true;
       try {
         const capture = await current(tabId);
-        if (!capture || capture.id !== message.capture_id) throw new Error('capture_changed');
+        if (!capture || !capture.items.length || capture.id !== message.capture_id) throw new Error('capture_changed');
         const context = await api('/context',session);
         const entity = context.entities.find(e=>e.id === message.entity_id);
         const target = capture.product === 'card' ? entity?.cards.find(c=>c.id === message.card_id) : entity?.accounts.find(a=>a.id === message.account_id);

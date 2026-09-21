@@ -27,17 +27,20 @@
     try {
       const result=await message('transfer.context');
       if(version!==generation || !signedIn) return;
+      const previous=state?.capture?.last4===result.capture?.last4 && state?.capture?.product===result.capture?.product ? {entity:el('entity').value,account:el('destination-account').value} : null;
       state=result;
       el('destination').hidden=!state.capture;
       el('capture-summary').textContent=state.capture ? t('{count} transactions · ending {last4} · {from} to {to}',{count:state.capture.count,last4:state.capture.last4,from:state.capture.coverage.start,to:state.capture.coverage.end}) : t('In your bank, open your transactions and click “Send to Clatri”.');
-      if(state.capture && !state.capture.coverage.complete) el('capture-summary').textContent+=' '+t('The bank did not confirm the end of the list. Only the received transactions will be sent.');
+      if(state.capture && !state.capture.count) el('capture-summary').textContent=t('Choose a destination, then load the bank transactions below.');
+      if(state.capture?.count && !state.capture.coverage.complete) el('capture-summary').textContent+=' '+t('The bank did not confirm the end of the list. Only the received transactions will be sent.');
       options(el('entity'),state.entities,'Choose an entity');
-      if(state.selection && state.entities.some(e=>e.id===state.selection.entity_id)) el('entity').value=state.selection.entity_id;
+      const entityId=previous?.entity || state.selection?.entity_id;
+      if(state.entities.some(e=>e.id===entityId)) el('entity').value=entityId;
       destinations();
-      const saved=state.capture?.product==='card' ? state.selection?.card_id : state.selection?.account_id;
-      if(saved && [...el('destination-account').options].some(o=>o.value===saved)) {el('destination-account').value=saved;el('send-transactions').disabled=false;}
+      const saved=previous?.account || (state.capture?.product==='card' ? state.selection?.card_id : state.selection?.account_id);
+      if(saved && [...el('destination-account').options].some(o=>o.value===saved)) {el('destination-account').value=saved;el('send-transactions').disabled=!state.capture?.count;}
       el('destination-label').textContent=t(state.capture?.product==='card' ? 'Credit card in Clatri' : 'Bank account in Clatri');
-      if(state.job) poll(state.job,version);
+      if(state.job && state.capture?.count) poll(state.job,version);
       else status('');
     } catch(error) { if(version===generation) {el('destination').hidden=true;status(t(errors[error.message] || errors.import_unavailable));} }
   }
@@ -74,10 +77,10 @@
     } catch(error) { if(version===generation) status(t(errors[error.message] || errors.import_unavailable)); }
   }
   el('entity').addEventListener('change',destinations);
-  el('destination-account').addEventListener('change',()=>{el('send-transactions').disabled=busy || !el('destination-account').value;});
+  el('destination-account').addEventListener('change',()=>{el('send-transactions').disabled=busy || !state?.capture?.count || !el('destination-account').value;});
   el('refresh-transfer').addEventListener('click',refresh);
   el('send-transactions').addEventListener('click',async()=>{
-    if(busy || !state?.capture || !el('entity').value || !el('destination-account').value) return;
+    if(busy || !state?.capture?.count || !el('entity').value || !el('destination-account').value) return;
     busy=true;el('send-transactions').disabled=true;el('entity').disabled=true;el('destination-account').disabled=true;
     const version=generation;
     status(t('Sending transactions…'));

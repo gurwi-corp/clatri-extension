@@ -65,3 +65,14 @@ test('retries reuse a transport ID while another destination gets its own send',
  const sends=f.requests.filter(r=>r.url.endsWith('/imports')).map(r=>JSON.parse(r.init.body));
  assert.equal(sends[0].capture_id,sends[1].capture_id);assert.notEqual(sends[0].capture_id,sends[2].capture_id);
 });
+
+test('destinations load before bank rows but an empty preparation cannot send',async()=>{
+ const f=fixture(); const {items,complete,...selection}=capture();
+ await f.transfer.prepare(selection,7);
+ const state=await f.transfer.handle({type:'transfer.context'},7);
+ assert.equal(state.capture.count,0);assert.equal(state.entities.length,1);
+ await assert.rejects(f.transfer.handle({type:'transfer.send',capture_id:state.capture.id,entity_id:'entity',account_id:'account'},7),/capture_changed/);
+ assert.equal(f.requests.some(r=>r.url.endsWith('/imports')),false);
+ await f.transfer.stage(capture(),7);
+ assert.equal((await f.transfer.handle({type:'transfer.context'},7)).capture.count,1);
+});
