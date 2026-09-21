@@ -77,7 +77,7 @@
       .launcher:active { transform: translateY(0); }
 
       .panel {
-        width: 348px; background: var(--c-bg); color: var(--c-ink);
+        width: 420px; background: var(--c-bg); color: var(--c-ink);
         border: 1px solid var(--c-line); border-radius: 16px;
         box-shadow: 0 2px 4px rgba(0,0,0,.04), 0 24px 56px rgba(0,0,0,.18);
         overflow: hidden;
@@ -109,7 +109,7 @@
       /* Instructions come as one string; blank lines in it separate the steps. */
       .bank-help { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--c-ink-2); white-space: pre-line; }
 
-      @media (max-width: 420px) {
+      @media (max-width: 480px) {
         .wrap { right: 12px; }
         .panel { width: calc(100vw - 24px); }
       }

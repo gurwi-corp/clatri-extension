@@ -16,7 +16,8 @@
 
     "Record as a separate transaction": "Registrar como otro movimiento",
     "Existing transaction": "Movimiento existente",
-    "Choose an existing transaction": "Selecciona el movimiento existente",
+    "Same date and amount as one you already have:": "Misma fecha y valor que uno que ya tienes:",
+    "No description": "Sin descripción",
     "Already in Clatri": "Ya está en Clatri",
     "The transaction changed. Refresh its status before retrying.": "El movimiento cambió. Actualiza el estado antes de reintentar.",
     " The bank did not confirm the end of the list; the file contains every transaction received.": " El banco no confirmó el final de la lista; el archivo contiene todos los movimientos recibidos.",
