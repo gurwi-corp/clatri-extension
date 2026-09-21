@@ -129,6 +129,7 @@ const sandbox = {
     addEventListener() {}
   },
   setTimeout,
+  clearTimeout,
   Intl,
   fetch: async () => ({ ok: true, json: async () => ({}) }),
   location: {
@@ -171,6 +172,7 @@ const SCRIPTS = [
   "src/core/engine.js",
   "src/core/export.js",
   "src/core/i18n.js",
+  "src/ui/kit.js",
   "src/ui/panel.js",
 ];
 for (const file of SCRIPTS) {
@@ -372,10 +374,12 @@ await new Promise(resolve=>setTimeout(resolve,0));
 ok('unknown completion downloads normally without an incomplete filename', downloads === 2 && !sandbox.__lastDownload.name.includes('incomplete'));
 ok('unknown completion stays explicit in JSON metadata', JSON.parse(sandbox.__lastDownload.content).capture_status === 'unknown');
 byId.sendTab.fire('click');
-ok('send tab hides download controls and shows destinations area', byId.downloadPanel.hidden && !byId.sendPanel.hidden);
+ok('send tab folds download controls and unfolds destinations area', byId.downloadPanel.dataset.open === "false" && byId.sendPanel.dataset.open === "true");
+ok('the segmented thumb follows the selected tab', byId.modeTabs.dataset.index === "0");
+ok('a skeleton stands in while destinations load', byId.transferSkeleton.hidden === false);
 ok('send tab prepares destinations without first fetching bank rows', sandbox.__messages.some(m=>m.channel==='clatri-prepare-transfer'));
 byId.downloadTab.fire('click');
-ok('download tab hides the send form', !byId.downloadPanel.hidden && byId.sendPanel.hidden);
+ok("download tab folds the send form", byId.downloadPanel.dataset.open === "true" && byId.sendPanel.dataset.open === "false" && byId.modeTabs.dataset.index === "1", JSON.stringify([byId.downloadPanel.dataset, byId.sendPanel.dataset, byId.modeTabs.dataset]));
 byId.sendTab.fire('click');
 byId.sendClatri.fire('click');
 await new Promise(resolve=>setTimeout(resolve,0));

@@ -57,7 +57,7 @@ request('auth.status');
 if (document.body?.classList.contains('bank-view')) {
   let lastHeight=0;
   new ResizeObserver(()=>{
-    const height=Math.min(900,Math.max(200,Math.ceil(document.body.scrollHeight)));
+    const height=Math.min(900,Math.max(96,Math.ceil(document.body.scrollHeight)));
     if(height===lastHeight)return;lastHeight=height;
     chrome.runtime.sendMessage({type:'frame.resize',height}).catch(()=>{});
   }).observe(document.body);

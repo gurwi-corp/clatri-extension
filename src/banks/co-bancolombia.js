@@ -542,7 +542,7 @@
     country: "CO",
     name: "Bancolombia",
     currency: "COP",
-    instructions: "In Sucursal Virtual Personas, open your account or card and view its transactions in the bank’s interface. Once they are visible, return to Clatri to download them or send them to your Clatri account. For accounts, set the dates in the bank’s search and search once before downloading.",
+    instructions: "Clatri reads the product you open in the bank. For a savings account’s transactions, go into that savings account in Sucursal Virtual Personas and view its transactions. For a credit card’s, go into that card. Repeat for each product you want.\n\nOnce you can see the transactions, return to Clatri to download them or send them to your Clatri account.\n\nFor accounts, set the dates in the bank’s search and search once before downloading.",
 
     matchesHost: (host) => /(^|\.)bancolombia\.com$/i.test(host),
 

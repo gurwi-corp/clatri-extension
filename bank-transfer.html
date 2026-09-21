@@ -4,12 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Enviar a Clatri</title>
+  <!-- The kit mounts its tokens and components before the page styles read them. -->
+  <script src="src/ui/kit.js" data-mount></script>
   <link rel="stylesheet" href="src/ui/sidepanel.css">
 </head>
 <body class="bank-view">
   <header><img src="icons/icon-48.png" width="32" height="32" alt=""><span>Clatri</span></header>
   <main>
-    <section id="loading" aria-live="polite"><p class="muted"><span data-i18n>Checking your session…</span></p></section>
+    <section id="loading" aria-live="polite">
+      <div class="form" aria-hidden="true"><span class="skeleton short"></span><span class="skeleton"></span><span class="skeleton short"></span><span class="skeleton"></span></div>
+      <p class="sr-only"><span data-i18n>Checking your session…</span></p>
+    </section>
     <section id="login" hidden>
       <h1><span data-i18n>Welcome to Clatri Extension</span></h1>
       <p class="intro"><span data-i18n>With this extension, you’ll be able to download your bank transactions and send them to your account on </span><a href="https://clatri.com" target="_blank" rel="noopener noreferrer">Clatri</a>.</p>
@@ -19,21 +24,23 @@
       </div>
     </section>
     <section id="account" hidden>
-      <div class="bank-session"><span class="connected" aria-hidden="true"></span><p id="email"></p></div>
       <section id="transfer" class="transfer">
-        <h2 data-i18n>Send transactions</h2>
-        <p id="capture-summary" class="muted" aria-live="polite"></p>
-        <div id="destination" hidden>
-          <label for="entity" data-i18n>Entity in Clatri</label><select id="entity"></select>
-          <label id="destination-label" for="destination-account" data-i18n>Destination account or card</label><select id="destination-account"></select>
-          <p id="destination-empty" hidden><a href="https://clatri.com" target="_blank" rel="noopener noreferrer" data-i18n>Create an account or card in Clatri</a></p>
+        <p id="capture-summary" class="msg" aria-live="polite"></p>
+        <div id="transfer-skeleton" class="form" aria-hidden="true" hidden><span class="skeleton short"></span><span class="skeleton"></span><span class="skeleton short"></span><span class="skeleton"></span></div>
+        <div id="destination" class="form enter" hidden>
+          <div><span class="label" id="entity-label" data-i18n>Entity in Clatri</span><div class="picker" id="entity" aria-expanded="false"></div></div>
+          <div><span class="label" id="destination-label" data-i18n>Destination account or card</span><div class="picker" id="destination-account" aria-expanded="false"></div></div>
+          <p id="destination-empty" class="msg" hidden><a href="https://clatri.com" target="_blank" rel="noopener noreferrer" data-i18n>Create an account or card in Clatri</a></p>
           <button id="send-transactions" class="primary" data-i18n>Send to Clatri</button>
         </div>
-        <p id="transfer-status" role="status" aria-live="polite"></p>
+        <p id="transfer-status" class="msg" role="status" aria-live="polite"></p>
         <ul id="import-issues"></ul>
-        <button id="refresh-transfer" class="text-button" data-i18n>Refresh</button>
       </section>
-      <button id="logout" class="logout-button"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 4H5v16h5M14 8l4 4-4 4M9 12h9"/></svg><span data-i18n>Sign out</span></button>
+      <footer class="frame-footer">
+        <div class="bank-session"><span class="dot live" aria-hidden="true"></span><p id="email"></p></div>
+        <button id="refresh-transfer" class="quiet"></button>
+        <button id="logout" class="quiet"><span data-i18n>Sign out</span></button>
+      </footer>
     </section>
     <section id="mfa" hidden>
       <div class="eyebrow"><span data-i18n>TWO-STEP VERIFICATION</span></div><h1><span data-i18n>Confirm it’s you</span></h1>

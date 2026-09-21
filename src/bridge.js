@@ -8,6 +8,9 @@
   let captureAllowedUntil = 0;
   let preparation = Promise.resolve();
   let generation = 0;
+  // Reloading or updating the extension orphans this script: chrome.runtime
+  // throws from then on. Tell the panel once instead of failing in the console.
+  const alive = () => { try { return Boolean(chrome.runtime?.id); } catch { return false; } };
   const allowCapture = event => {
     if (!event.isTrusted || event.target?.id !== 'clatri-root') return;
     // A real click in the bank panel can stage evidence; it cannot submit it.
@@ -18,6 +21,10 @@
   document.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End','Enter',' '].includes(event.key))allowCapture(event);},true);
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
+    if(!alive()) {
+      if(['clatri-prepare-transfer','clatri-stage-transfer'].includes(event.data?.channel)) window.postMessage({channel:'clatri-transfer-staged',ok:false,reason:'updated'},location.origin);
+      return;
+    }
     if(event.data?.channel==='clatri-clear-transfer') {
       generation++;
       document.getElementById('clatri-root')?.shadowRoot?.getElementById('transfer-frame')?.remove();
@@ -45,7 +52,8 @@
             slot.replaceChildren();
             const frame=document.createElement('iframe');frame.id='transfer-frame';frame.src=response.url;
             frame.title=chrome.i18n?.getUILanguage?.().startsWith('es') ? 'Enviar a Clatri' : 'Send to Clatri';
-            frame.style.cssText='width:100%;height:510px;border:0;display:block;border-radius:12px';
+            // Starts at the frame's minimum and eases to whatever height it reports.
+            frame.style.cssText='width:calc(100% + 6px);margin:0 -3px;height:96px;border:0;display:block;transition:height .24s cubic-bezier(.2,.7,.2,1)';
             slot.append(frame);
           }
         }
@@ -56,7 +64,7 @@
   chrome.runtime.onMessage.addListener((message,sender)=>{
     if(sender.id!==chrome.runtime.id || message?.type!=='frame.resize' || !Number.isInteger(message.height))return;
     const frame=document.getElementById('clatri-root')?.shadowRoot?.getElementById('transfer-frame');
-    if(frame)frame.style.height=Math.max(200,Math.min(900,message.height))+'px';
+    if(frame)frame.style.height=Math.max(96,Math.min(900,message.height))+'px';
   });
   try {
     document.documentElement.dataset.clatriLocale = chrome.i18n?.getUILanguage?.() || navigator.language || "en";
