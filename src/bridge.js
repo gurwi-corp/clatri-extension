@@ -45,7 +45,8 @@
             slot.replaceChildren();
             const frame=document.createElement('iframe');frame.id='transfer-frame';frame.src=response.url;
             frame.title=chrome.i18n?.getUILanguage?.().startsWith('es') ? 'Enviar a Clatri' : 'Send to Clatri';
-            frame.style.cssText='width:100%;height:510px;border:0;display:block;border-radius:12px';
+            // Starts at the frame's minimum and eases to whatever height it reports.
+            frame.style.cssText='width:calc(100% + 6px);margin:0 -3px;height:200px;border:0;display:block;transition:height .24s cubic-bezier(.2,.7,.2,1)';
             slot.append(frame);
           }
         }

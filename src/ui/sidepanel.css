@@ -1,16 +1,13 @@
+/*
+ * Page layout for the extension's own documents: the side panel and the
+ * transfer frame (body.bank-view). Colours, controls and motion come from
+ * src/ui/kit.js, which each page loads in <head>; nothing here names a colour.
+ */
 :root {
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  color: #1a1a1a;
-  background: #fff;
+  font-family: var(--font);
   font-size: 14px;
-  color-scheme: light;
-}
-* {
-  box-sizing: border-box;
+  color: var(--c-ink);
+  background: var(--c-bg);
 }
 body {
   margin: 0;
@@ -18,13 +15,15 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--c-bg);
+  --h-action: 46px;
 }
 header {
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 18px 16px;
-  border-bottom: 1px solid #eceef0;
+  border-bottom: 1px solid var(--c-line);
   font-weight: 650;
   font-size: 18px;
 }
@@ -48,20 +47,35 @@ h2 {
   margin: 0 0 8px;
 }
 .eyebrow {
-  color: #6b35bd;
+  color: var(--c-accent);
   font-weight: 650;
   font-size: 10px;
   letter-spacing: 1.15px;
 }
 .intro {
   font-size: 14px;
-  color: #565b60;
+  color: var(--c-ink-2);
   line-height: 1.6;
   margin: 0 0 30px;
 }
-.providers {
-  display: grid;
-  gap: 10px;
+.intro a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.intro a:hover {
+  color: var(--c-ink);
+}
+.muted {
+  color: var(--c-ink-2);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 button,
 a {
@@ -71,25 +85,27 @@ button {
   font: inherit;
   cursor: pointer;
 }
-button:disabled {
-  cursor: wait;
-  opacity: .6;
+
+.providers {
+  display: grid;
+  gap: 10px;
 }
 .provider {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border: 1px solid #d5d8dd;
+  border: 1px solid var(--c-line-strong);
   border-radius: 12px;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--c-bg);
+  color: var(--c-ink);
   min-height: 48px;
   padding: 12px;
   font-weight: 550;
+  transition: background-color var(--t-fast) var(--ease);
 }
 .provider:hover {
-  background: #f6f7f8;
+  background: var(--c-field-hover);
 }
 .provider svg {
   width: 20px;
@@ -97,19 +113,27 @@ button:disabled {
   flex-shrink: 0;
 }
 .apple {
-  background: #1a1a1a;
-  color: white;
-  border-color: #1a1a1a;
+  background: var(--c-action);
+  color: var(--c-on-action);
+  border-color: var(--c-action);
 }
 .apple:hover {
-  background: #333;
+  background: var(--c-action-hover);
 }
+/* Auth requests lock these while they run. */
+.provider:disabled,
+.logout-button:disabled,
+.text-button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
 .account-card {
   display: flex;
   align-items: center;
   gap: 11px;
-  background: #f6f7f8;
-  border: 1px solid #eceef0;
+  background: var(--c-field);
+  border: 1px solid var(--c-line);
   border-radius: 14px;
   padding: 16px;
   margin: 23px 0 16px;
@@ -119,7 +143,7 @@ button:disabled {
 }
 .account-card p {
   font-size: 12px;
-  color: #565b60;
+  color: var(--c-ink-2);
   margin: 5px 0 0;
   overflow-wrap: anywhere;
 }
@@ -130,35 +154,48 @@ button:disabled {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #218242;
+  background: var(--c-live);
   flex-shrink: 0;
 }
 .primary {
+  font-size: 14px;
+  border-radius: 12px;
+}
+.open-app {
+  margin-bottom: 10px;
+}
+.logout-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 12px;
-  border: 0;
-  border-radius: 12px;
-  background: #7431ff;
-  color: white;
-  text-decoration: none;
-  font-weight: 550;
+  gap: 8px;
   width: 100%;
-  font-size: 14px;
+  min-height: 44px;
+  padding: 11px 14px;
+  margin: 0 0 16px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--c-ink-2);
+  font-weight: 550;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
-.primary:hover {
-  background: #6121e1;
+.logout-button svg {
+  width: 18px;
+  height: 18px;
 }
+.logout-button:hover {
+  background: var(--c-field-hover);
+  color: var(--c-ink);
+}
+
 .bank-note {
   margin-top: 28px;
   padding-top: 24px;
-  border-top: 1px solid #eceef0;
+  border-top: 1px solid var(--c-line);
 }
 .bank-note p {
-  color: #565b60;
+  color: var(--c-ink-2);
   line-height: 1.65;
   font-size: 13px;
   margin: 0;
@@ -167,7 +204,7 @@ button:disabled {
   margin-top: 12px;
 }
 .bank-note a {
-  color: #6b35bd;
+  color: var(--c-ink);
   text-underline-offset: 3px;
 }
 .bank-note .link-icon {
@@ -180,7 +217,7 @@ button:disabled {
   padding: 10px 0;
   border: 0;
   background: none;
-  color: #565b60;
+  color: var(--c-ink-2);
   text-decoration: underline;
   text-underline-offset: 4px;
   margin-top: 12px;
@@ -188,53 +225,45 @@ button:disabled {
   line-height: 1.6;
 }
 .text-button:hover {
-  color: #7431ff;
+  color: var(--c-ink);
 }
 #message {
   font-size: 13px;
   line-height: 1.6;
   padding: 12px;
-  border-radius: 10px;
-  background: #f6f7f8;
+  border-radius: var(--r-field);
+  background: var(--c-field);
   overflow-wrap: anywhere;
 }
 #message.error {
-  background: #fff1f0;
-  color: #922b21;
+  background: var(--c-danger-bg);
+  color: var(--c-danger);
 }
-.muted {
-  color: #565b60;
-}
-label {
+
+/* Two-step verification */
+#mfa-form label {
   display: block;
   line-height: 1.6;
   margin: 20px 0 8px;
 }
-input {
+#code {
   width: 100%;
   font: inherit;
   font-size: 24px;
   letter-spacing: 5px;
-  border: 1px solid #b8bec5;
-  border-radius: 10px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-field);
+  background: var(--c-field);
+  color: var(--c-ink);
   padding: 12px;
   margin-bottom: 14px;
 }
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-summary:focus-visible {
-  outline: 3px solid #7431ff;
-  outline-offset: 3px;
-}
-[hidden] {
-  display: none !important;
-}
+
 @media (max-width: 220px) {
   h1 {
     font-size: 22px;
   }
-    .provider {
+  .provider {
     gap: 7px;
     font-size: 12px;
   }
@@ -242,47 +271,106 @@ summary:focus-visible {
     padding-top: 24px;
   }
 }
-.intro a {
-  color: inherit;
-  text-decoration: underline;
+
+/*
+ * Transfer frame. It sits inside the floating panel on the bank's page, so it
+ * takes the panel's density and has no chrome of its own.
+ */
+.bank-view {
+  min-height: 0;
+  --h-action: 40px;
+}
+.bank-view header {
+  display: none;
+}
+/* The frame is flush with the panel's padding; leave room for focus rings. */
+.bank-view main {
+  padding: 3px;
+}
+.bank-view h1 {
+  font-size: 19px;
+  letter-spacing: -.4px;
+  margin-top: 0;
+}
+.bank-view .intro {
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.bank-view .primary {
+  font-size: 13px;
+  border-radius: var(--r-field);
+}
+.bank-view #message,
+.bank-view .text-button {
+  margin-top: 12px;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+.transfer {
+  display: grid;
+  gap: 12px;
+}
+.transfer .msg a {
+  color: var(--c-ink);
   text-underline-offset: 3px;
 }
-.intro a:hover {
-  color: #7431ff;
+
+#import-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--c-ink-2);
+}
+#import-issues:empty {
+  display: none;
+}
+#import-issues li {
+  padding: 10px 0;
+  border-top: 1px solid var(--c-line);
+}
+.issue-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.issue-actions .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.small {
+  width: auto;
+  min-height: 30px;
+  padding: 4px 11px;
+  font-size: 12px;
 }
 
-.transfer {margin:24px 0;padding:20px 0;border-top:1px solid #eceef0;border-bottom:1px solid #eceef0;}
-.transfer p {font-size:13px;line-height:1.6;}
-.transfer select {width:100%;min-width:0;padding:12px;border:1px solid #d5d8dd;border-radius:10px;background:#fff;color:#1a1a1a;font:inherit;margin-bottom:12px;}
-.transfer ul {padding-left:18px;font-size:12px;line-height:1.6;}
-.transfer li+li {margin-top:8px;}
-select:focus-visible {outline:3px solid #7431ff;outline-offset:3px;}
-
-.issue-actions {display:grid;gap:4px;margin-top:4px;}
-.issue-actions .text-button {margin-top:0;}
-
-.logout-button {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 14px;margin:0 0 16px;border:1px solid #d5d8dd;border-radius:10px;background:transparent;color:#565b60;font-weight:550;min-height:44px;}
-.logout-button svg {width:18px;height:18px;}
-.logout-button:hover {background:#f6f7f8;color:#1a1a1a;}
-.open-app {margin-bottom:10px;}
-.bank-view {min-height:0;background:#fff;}
-.bank-view header {display:none;}
-.bank-view main {padding:16px;}
-.bank-view h1 {font-size:21px;}
-.bank-view .intro {margin-bottom:16px;}
-.bank-session {display:flex;align-items:center;gap:8px;font-size:12px;color:#565b60;overflow-wrap:anywhere;}
-.bank-session p {margin:0;min-width:0;}
-.bank-view .transfer {border:0;padding:0;margin:16px 0;}
-.bank-view .transfer label {margin:12px 0 6px;font-size:13px;}
-.bank-view .transfer h2 {font-size:17px;}
-.bank-view .logout-button {margin-bottom:0;}
-.bank-view #refresh-transfer {margin-top:0;}
-@media(prefers-color-scheme:dark) {
- .bank-view {background:#1b1c1e;color:#f2f3f4;color-scheme:dark;}
- .bank-view .muted,.bank-view .bank-session,.bank-view .text-button {color:#b6babe;}
- .bank-view .transfer select,.bank-view input {background:#232426;color:#f2f3f4;border-color:#424448;}
- .bank-view .logout-button {color:#b6babe;border-color:#424448;}
- .bank-view .logout-button:hover {background:#232426;color:white;}
- .bank-view #message {background:#232426;}
- .bank-view .primary {background:#f2f3f4;color:#1b1c1e;}
+.frame-footer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--c-line);
+}
+.bank-session {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--c-ink-2);
+}
+.bank-session p {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
