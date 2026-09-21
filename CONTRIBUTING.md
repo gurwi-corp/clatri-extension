@@ -25,6 +25,10 @@ One bank, one pull request.
 2. That file listed in `manifest.json` next to `co-bancolombia.js`
 3. The bank's hosts added to every `matches` array in `manifest.json`
 4. If the country is new, one entry in `COUNTRIES` inside `src/core/registry.js`
+5. In the pull request, say which products you verified (savings account,
+   credit card…) and what does not work yet. The public list lives at
+   [docs.clatri.com/extension](https://docs.clatri.com/extension/) and is updated
+   from that description when the bank ships.
 
 Do not touch `src/core/`, `src/ui/`, or the engine “while you are here”. If the
 bank really needs a core change, open a separate issue first. Mixing a new bank
