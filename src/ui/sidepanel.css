@@ -321,49 +321,6 @@ button {
   text-underline-offset: 3px;
 }
 
-/* Movements Clatri could not settle alone: one read-only card each. */
-#import-issues {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-#import-issues:empty {
-  display: none;
-}
-.issue {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--c-line);
-  border-radius: 12px;
-}
-.issue-head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.issue-title {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.issue-amount {
-  flex: none;
-  font-variant-numeric: tabular-nums;
-}
-.issue-meta {
-  margin: -6px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--c-ink-2);
-}
-
 .frame-footer {
   display: flex;
   align-items: center;
