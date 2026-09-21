@@ -20,6 +20,7 @@ function render(result) {
   byId('loading').hidden = true;
   byId('login').hidden = result.status !== 'signed_out';
   byId('account').hidden = result.status !== 'signed_in';
+  byId('bank-session-note').hidden = result.status !== 'signed_in';
   byId('mfa').hidden = result.status !== 'mfa_required';
   byId('email').textContent = result.user?.email || t("Your Clatri account");
   byId('code').value = '';

@@ -104,12 +104,6 @@ button:disabled {
 .apple:hover {
   background: #333;
 }
-.privacy {
-  margin-top: 22px;
-  line-height: 1.6;
-  font-size: 12px;
-  color: #626970;
-}
 .account-card {
   display: flex;
   align-items: center;
