@@ -46,7 +46,7 @@
             const frame=document.createElement('iframe');frame.id='transfer-frame';frame.src=response.url;
             frame.title=chrome.i18n?.getUILanguage?.().startsWith('es') ? 'Enviar a Clatri' : 'Send to Clatri';
             // Starts at the frame's minimum and eases to whatever height it reports.
-            frame.style.cssText='width:calc(100% + 6px);margin:0 -3px;height:200px;border:0;display:block;transition:height .24s cubic-bezier(.2,.7,.2,1)';
+            frame.style.cssText='width:calc(100% + 6px);margin:0 -3px;height:96px;border:0;display:block;transition:height .24s cubic-bezier(.2,.7,.2,1)';
             slot.append(frame);
           }
         }
@@ -57,7 +57,7 @@
   chrome.runtime.onMessage.addListener((message,sender)=>{
     if(sender.id!==chrome.runtime.id || message?.type!=='frame.resize' || !Number.isInteger(message.height))return;
     const frame=document.getElementById('clatri-root')?.shadowRoot?.getElementById('transfer-frame');
-    if(frame)frame.style.height=Math.max(200,Math.min(900,message.height))+'px';
+    if(frame)frame.style.height=Math.max(96,Math.min(900,message.height))+'px';
   });
   try {
     document.documentElement.dataset.clatriLocale = chrome.i18n?.getUILanguage?.() || navigator.language || "en";

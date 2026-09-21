@@ -45,7 +45,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     const bankView=await bankFrames.accepts(sender);
     if(!bankView && !isTrustedPanel(sender,chrome.runtime)) {reply({ok:false});return;}
     try {
-      if(bankView && message?.type==='frame.resize' && Number.isInteger(message.height) && message.height>=200 && message.height<=900) {
+      if(bankView && message?.type==='frame.resize' && Number.isInteger(message.height) && message.height>=96 && message.height<=900) {
         await chrome.tabs.sendMessage(sender.tab.id,{type:'frame.resize',height:message.height},{frameId:0});reply({ok:true});return;
       }
       if(message?.type==='usage.active') {await transfer.usage('active');reply({ok:true});return;}

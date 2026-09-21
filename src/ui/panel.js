@@ -188,11 +188,14 @@
                   <button class="primary" id="run">${t("Download CSV")}</button>
                   <button class="icon" id="copy" title="${t("Copy to clipboard")}" aria-label="${t("Copy to clipboard")}">${kit.icons.copy}</button>
                 </div>
+                <p class="msg" id="msg" aria-live="polite"></p>
+                <button class="ghost" id="downloadPartial" hidden></button>
               </div>
             </div>
             <div class="collapse" id="sendPanel" role="tabpanel" aria-labelledby="sendTab" data-open="false">
               <div class="collapse-inner stack">
                 <button class="primary" id="sendClatri">${t("Load transactions")}</button>
+                <p class="msg" id="sendMsg" aria-live="polite"></p>
                 <div class="stack" id="transferSkeleton" aria-hidden="true" hidden>
                   <span class="skeleton short"></span><span class="skeleton"></span>
                   <span class="skeleton short"></span><span class="skeleton"></span>
@@ -201,9 +204,6 @@
               </div>
             </div>
           </div>
-
-          <p class="msg" id="msg" aria-live="polite"></p>
-          <button class="ghost" id="downloadPartial" hidden></button>
 
         </div>
       </div>
@@ -289,9 +289,7 @@
     } catch (error) {
       console.error("[clatri] render failed", error);
       try {
-        const message = el("msg");
-        message.textContent = t("The panel could not be updated. Please reload the page.");
-        message.className = "msg error";
+        showMessage(t("The panel could not be updated. Please reload the page."), "error");
       } catch {}
     }
   }
@@ -396,9 +394,15 @@
     }
     el("downloadPartial").textContent = t("Download recovered rows ({count}) · incomplete", { count: ui.partial?.transactions.length || 0 });
 
-    const message = el("msg");
-    message.textContent = ui.message;
-    message.className = `msg${ui.tone === "error" ? " error" : ui.tone === "ok" ? " ok" : ""}`;
+    showMessage(ui.message, ui.tone);
+  }
+
+  /** Each mode reports right under its own action; the folded one is not read out. */
+  function showMessage(text, tone) {
+    for (const id of ["msg", "sendMsg"]) {
+      el(id).textContent = text;
+      el(id).className = `msg${tone === "error" ? " error" : tone === "ok" ? " ok" : ""}`;
+    }
   }
 
   function say(message, tone = "neutral") {

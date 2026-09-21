@@ -54,7 +54,7 @@
       el('destination-label').textContent=t(state.capture?.product==='card' ? 'Credit card in Clatri' : 'Bank account in Clatri');
       if(state.job && state.capture?.count) poll(state.job,version);
       else status('');
-    } catch(error) { if(version===generation) {el('transfer-skeleton').hidden=true;el('destination').hidden=true;fail(error);} }
+    } catch(error) { if(version===generation) {el('transfer-skeleton').hidden=true;el('destination').hidden=true;el('capture-summary').textContent='';fail(error);} }
   }
   function issueRow(job,item,version) {
     const li=document.createElement('li');
