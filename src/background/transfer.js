@@ -77,9 +77,6 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
           job: capture && last?.capture === capture.id ? last.job : null, sent: capture && last?.capture === capture.id ? last.destination : null };
       }
       if (message.type === 'transfer.status' && allowed(message,['type','id']) && /^[0-9a-f-]{36}$/.test(message.id)) return api('/imports/' + message.id,session);
-      if (message.type === 'transfer.resolve' && allowed(message,['type','id','item_key','action','expected_version','target_event_id']) && /^[0-9a-f-]{36}$/.test(message.id) && text(message.item_key,128) && Number.isInteger(message.expected_version) && ['distinct','same_existing'].includes(message.action)) {
-        return api('/imports/' + message.id + '/items/' + encodeURIComponent(message.item_key) + '/resolve',session,{action:message.action,expected_version:message.expected_version,target_event_id:message.target_event_id || null});
-      }
       if (message.type !== 'transfer.send' || !allowed(message,['type','capture_id','entity_id','account_id','card_id']) || sending) throw new Error('invalid_message');
       sending = true;
       try {

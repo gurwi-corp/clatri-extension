@@ -1,12 +1,11 @@
 (() => {
-  const {t,locale}=globalThis.ClatriI18n;
+  const {t}=globalThis.ClatriI18n;
   const kit=globalThis.ClatriKit;
   const el=id=>document.getElementById(id);
   let state=null, signedIn=false, busy=false, timer=null, generation=0;
   // The import made from the rows on screen: 'none' | 'pending' | 'completed' | 'failed', and where it went.
   let jobStatus='none', sentKey=null;
   const errors={auth_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.',sign_in_required:'Sign in again to continue.',capture_changed:'The bank selection changed. Refresh before sending.',destination_conflict:'This bank account is already linked to another destination in this entity.',import_busy:'Another import is in progress. Try again shortly.',import_unavailable:'We couldn’t load your Clatri accounts. Try again in a moment.'};
-  const reasons={historical_fx_unavailable:'Historical exchange rate unavailable.',card_payment_or_refund:'Card payment or refund requires identification.',bank_status_not_completed:'Not yet completed at the bank.'};
   async function message(type, data={}) {
     const response=await chrome.runtime.sendMessage({type,...data});
     if (!response?.ok) throw new Error(response?.error || 'import_unavailable');
@@ -69,39 +68,12 @@
       else status('');
     } catch(error) { if(version===generation) {el('transfer-skeleton').hidden=true;el('destination').hidden=true;el('capture-summary').textContent='';fail(error);} }
   }
-  // Dates and money in the reader's language. A booking date is a calendar day,
-  // so it is built from its parts: parsing the ISO string would shift it by the
-  // browser's UTC offset.
-  const formats=locale()==='es' ? 'es-CO' : 'en-US';
-  function day(iso) {
-    const [y,m,d]=String(iso || '').split('-').map(Number);
-    if(!y || !m || !d) return '';
-    return new Intl.DateTimeFormat(formats,{day:'numeric',month:'short',year:'numeric'}).format(new Date(y,m-1,d));
-  }
-  function amount(item) {
-    if(item.amount==null || !item.currency) return '';
-    try { return (item.direction==='outgoing' ? '−' : '+')+new Intl.NumberFormat(formats,{style:'currency',currency:item.currency,maximumFractionDigits:2}).format(Number(item.amount)); }
-    catch { return ''; }
-  }
-  const node=(tag,className,text)=>{const made=document.createElement(tag);if(className) made.className=className;if(text!=null) made.textContent=text;return made;};
 
-  /**
-   * What Clatri could not settle on its own, for information only. A bank row
-   * that matches an existing movement is linked by the server; anything left is
-   * reviewed in Clatri, with the rest of the account in view, not in a bank tab.
-   */
-  function issueRow(item) {
-    const li=node('li','issue');
-    const head=node('div','issue-head');head.append(node('span','issue-title',item.description),node('span','issue-amount',amount(item)));
-    li.append(head,node('p','issue-meta',[day(item.booking_date),t(reasons[item.reason] || 'This transaction needs attention.')].filter(Boolean).join(' · ')));
-    return li;
-  }
   async function poll(id,version=generation) {
     clearTimeout(timer);
     try {
       const job=await message('transfer.status',{id});
       if(!signedIn || version!==generation) return;
-      el('import-issues').replaceChildren();
       el('review-in-clatri').hidden=!(job.status==='completed' && job.result?.issues);
       jobStatus=job.status==='completed' ? 'completed' : ['failed','cancelled'].includes(job.status) ? 'failed' : 'pending';
       syncSend();
@@ -112,7 +84,6 @@
         if(job.result.issues) counts.push(t('{count} to review in Clatri',{count:job.result.issues}));
         if(job.result.pending) counts.push(t('{count} pending at the bank',{count:job.result.pending}));
         status(counts.join(' · '),job.result.issues ? '' : 'ok');
-        for(const item of job.items || []) if(item.outcome==='issue' || item.outcome==='pending') el('import-issues').append(issueRow(item));
         if(job.result.classification?.startsWith('unclassified')) status(el('transfer-status').textContent+' '+t('Automatic categorization was unavailable.'),'ok');
       } else if(['failed','cancelled'].includes(job.status)) status(t('The import could not be completed.'),'error');
       else { status(t('Received by Clatri. Processing transactions…'),'working');timer=setTimeout(()=>poll(id,version),2500); }
@@ -138,5 +109,5 @@
     finally {lock(false);}
   });
   chrome.storage.onChanged.addListener((changes,area)=>{if(area==='session' && Object.keys(changes).some(k=>k.startsWith('capture:'))) refresh();});
-  globalThis.ClatriTransfer={authChanged(value){signedIn=value;generation++;clearTimeout(timer);if(value) refresh();else {state=null;jobStatus='none';sentKey=null;el('review-in-clatri').hidden=true;el('destination').hidden=true;el('transfer-skeleton').hidden=true;el('import-issues').replaceChildren();status('');}}};
+  globalThis.ClatriTransfer={authChanged(value){signedIn=value;generation++;clearTimeout(timer);if(value) refresh();else {state=null;jobStatus='none';sentKey=null;el('review-in-clatri').hidden=true;el('destination').hidden=true;el('transfer-skeleton').hidden=true;status('');}}};
 })();

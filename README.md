@@ -249,7 +249,7 @@ Spanish regional variants use Spanish; English and other languages use English.
 Reload the extension and the bank tab after changing the browser language.
 Bank descriptions, transaction data and CSV/JSON field names keep their original format.
 
-## Send to Clatri (0.16.1)
+## Send to Clatri (0.16.2)
 
 In the bank panel, choose the source account/card and period. The panel opens on the **Send** tab. Click **Load transactions**, choose your Clatri entity and bank account or credit card below it, and confirm with **Send to Clatri**. The **Download** tab keeps CSV/JSON export separate. Destinations load before any bank transaction request.
 The destination form appears inside that same panel. Choose your Clatri entity,
@@ -259,9 +259,8 @@ remembered and remains editable. The toolbar side panel is for sign-in and accou
 management, not transaction delivery.
 
 Each send supports up to 500 movements. The server validates destination access
-again. Identical rows within a capture remain separate occurrences. A row that
-matches a movement already on that account (same day, amount and direction) is
-linked to it by the server instead of being created again, one existing
-movement per row, so sending a period twice adds nothing. Card payments, refunds
-and unavailable historical exchange rates can remain as issues; the panel lists
-them for information and they are reviewed in Clatri, not here.
+again and handles the capture as a statement import: rows already in Clatri are
+skipped, so sending a period twice adds nothing; transfers between your own
+accounts and credit card payments are paired; everything that needs no review
+is registered at once. The panel shows the counts. Anything left to review, and
+the record of what was registered, is a statement card in Clatri's chat.
