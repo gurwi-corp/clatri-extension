@@ -32,6 +32,7 @@
     tone: "neutral",
     format: "csv",
     results: null,
+    partial: null,
     resultsContext: null,
     resultsKey: null,
   };
@@ -94,6 +95,10 @@
       .body > * { flex: none; }
       header { flex: none; }
 
+      summary.label { cursor: pointer; margin-bottom: 0; }
+      summary.label::before { content: "▸ "; }
+      details[open] > summary.label::before { content: "▾ "; }
+      .bank-help { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: inherit; opacity: .8; }
       .label { display: block; font-size: 10.5px; font-weight: 600; color: #8a8f95; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .045em; }
 
       input[type="date"], input[type="text"] {
@@ -172,7 +177,7 @@
       .icon:hover:not(:disabled) { background: #f2f3f4; color: #1a1a1a; }
       .icon:disabled { color: #b6babe; cursor: not-allowed; }
       .ghost {
-        width: 100%; height: 33px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px;
+        width: 100%; min-height: 33px; padding: 7px 9px; border: 1px solid rgba(0,0,0,.11); border-radius: 9px;
         background: #fff; color: #45494e; font-size: 12px; cursor: pointer;
       }
       .ghost:hover:not(:disabled) { background: #f2f3f4; color: #1a1a1a; }
@@ -182,6 +187,11 @@
       .msg.error { color: #c2340f; }
       .msg.ok { color: #17803d; }
       .msg:empty { display: none; }
+
+      @media (max-width: 420px) {
+        .wrap { right: 12px; }
+        .panel { width: calc(100vw - 24px); }
+      }
 
       @media (prefers-color-scheme: dark) {
         .launcher, .panel { background: #1b1c1e; color: #f2f3f4; border-color: rgba(255,255,255,.11); }
@@ -243,6 +253,11 @@
             </div>
           </div>
 
+          <details id="bankInstructions">
+            <summary class="label" id="bankInstructionsLabel">${t("Bank instructions")}</summary>
+            <p class="bank-help" id="bankInstructionsText"></p>
+          </details>
+
           <div class="status"><span class="dot" id="dot"></span><span class="text" id="status"></span></div>
 
           <div>
@@ -284,7 +299,8 @@
             </button>
           </div>
 
-          <p class="msg" id="msg"></p>
+          <p class="msg" id="msg" aria-live="polite"></p>
+          <button class="ghost" id="downloadPartial" hidden></button>
 
         </div>
       </div>
@@ -537,6 +553,8 @@
     el("launcherDot").classList.toggle("live", live);
 
     const bank = currentBank();
+    el("bankInstructions").hidden = !bank?.instructions;
+    el("bankInstructionsText").textContent = bank?.instructions ? t(bank.instructions) : "";
     if (!bankIsHere()) {
       el("status").textContent = t("Open {bank} to export from it", { bank: bank ? bank.name : t("the bank") });
     } else if (live) {
@@ -570,6 +588,11 @@
     el("run").disabled = !runnable;
     el("run").textContent = ui.busy ? t("Working…") : t("Download {format}", { format: formatOf(ui.format).label });
     el("copy").disabled = !runnable;
+    // A result belongs to its captured account and dates, never to a new selection.
+    if (ui.partial && ui.partial.key !== exportKey(selectedAccount())) ui.partial = null;
+    el("downloadPartial").hidden = !ui.partial || ui.busy;
+    el("downloadPartial").disabled = ui.busy;
+    el("downloadPartial").textContent = t("Download recovered rows ({count}) · incomplete", { count: ui.partial?.transactions.length || 0 });
 
     const message = el("msg");
     message.textContent = ui.message;
@@ -616,7 +639,7 @@
     exporter.download(text, exporter.filename(context, format.id), format.mime);
   }
 
-  const exportKey = (account) => `${account.number}|${ui.from}|${ui.to}`;
+  const exportKey = (account) => `${ui.countryCode}|${ui.bankId}|${account?.number || ""}|${ui.from}|${ui.to}`;
 
   /**
    * `mode` is "download" or "copy". A download always asks the bank again; a
@@ -641,7 +664,9 @@
       return;
     }
 
+    const requestKey = exportKey(account);
     ui.busy = true;
+    ui.partial = null;
     ui.results = null;
     ui.resultsKey = null;
     say(t("Requesting transactions…"));
@@ -656,6 +681,10 @@
       });
 
       ui.busy = false;
+      if (requestKey !== exportKey(selectedAccount())) {
+        say(t("The selection changed during the request. Download again for the selected account and dates."));
+        return;
+      }
       ui.results = truncated ? null : transactions;
       ui.resultsContext = contextFor(account, covered);
       ui.resultsKey = truncated ? null : exportKey(account);
@@ -663,15 +692,19 @@
       // Without a date filter to rewrite, Clatri only gets the bank's own window.
       const teachRange = t(" Clatri found no date filter in the bank request, so it can only read the range the bank chose. Set Desde and Hasta in the bank’s search, press search once, then come back.");
 
-      // A partial ledger is more dangerous than no ledger: importing it looks
-      // successful. Keep the recovered count in the message, but do not create
-      // a file or keep the rows around for copying.
+      // Never download an incomplete capture automatically or offer it for
+      // automatic import. A separate explicit download can recover the rows.
       if (truncated) {
-        const span = covered ? t(" The bank returned rows from {from} to {to}.", covered) : "";
-        say(
-          t("Export cancelled because the bank did not complete every date window.{span} {count} transactions were recovered but no partial file was created. Retry with a shorter range.", { span, count: transactions.length }),
-          "error"
-        );
+        if (transactions.length) {
+          ui.partial = {
+            transactions,
+            context: { ...ui.resultsContext, complete: false },
+            key: exportKey(account),
+          };
+        }
+        say(transactions.length
+          ? t("We could not confirm that the bank returned every transaction. {count} transactions were recovered. You can retry or download only those rows as an incomplete file.", { count: transactions.length })
+          : t("The bank did not complete the request and no transactions were recovered. Open the transactions in the bank and retry."), "error");
         return;
       }
 
@@ -755,6 +788,17 @@
     ui.message = "";
     // A card locks the date fields and reads its own template, so repaint.
     render();
+  });
+
+  el("downloadPartial").addEventListener("click", async () => {
+    const partial = ui.partial;
+    if (ui.busy || !partial || partial.key !== exportKey(selectedAccount())) return;
+    try {
+      await deliver("download", partial.transactions, partial.context);
+      say(t("Incomplete file downloaded: {count} recovered transactions. Other transactions may be missing.", { count: partial.transactions.length }), "neutral");
+    } catch {
+      say(t("The file could not be downloaded. Please retry."), "error");
+    }
   });
 
   el("from").addEventListener("change", (event) => {
