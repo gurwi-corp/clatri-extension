@@ -6,6 +6,7 @@
 (() => {
   "use strict";
   try {
+    document.documentElement.dataset.clatriLocale = chrome.i18n?.getUILanguage?.() || navigator.language || "en";
     document.documentElement.dataset.clatriLogo = chrome.runtime.getURL("icons/icon-128.png");
   } catch {}
 })();

@@ -32,13 +32,6 @@ header img {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.companion {
-  font-size: 11px;
-  font-weight: 400;
-  color: #626970;
-  margin-left: auto;
-  text-align: right;
-}
 main {
   padding: 32px 16px 24px;
   flex: 1;
@@ -176,6 +169,13 @@ button:disabled {
   font-size: 13px;
   margin: 0;
 }
+.bank-note p + p {
+  margin-top: 12px;
+}
+.bank-note a {
+  color: #6b35bd;
+  text-underline-offset: 3px;
+}
 .text-button {
   padding: 10px 0;
   border: 0;
@@ -196,18 +196,6 @@ footer {
   color: #666d73;
   font-size: 11px;
   line-height: 1.6;
-}
-details {
-  margin-top: 12px;
-}
-summary {
-  cursor: pointer;
-}
-code {
-  display: block;
-  overflow-wrap: anywhere;
-  color: #444;
-  font-size: 11px;
 }
 #message {
   font-size: 13px;
@@ -253,10 +241,7 @@ summary:focus-visible {
   h1 {
     font-size: 22px;
   }
-  .companion {
-    display: none;
-  }
-  .provider {
+    .provider {
     gap: 7px;
     font-size: 12px;
   }

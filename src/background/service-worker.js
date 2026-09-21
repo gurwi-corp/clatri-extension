@@ -23,10 +23,6 @@ function getController() {
 // Register synchronously so Chrome can wake a suspended worker for a message.
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (!isTrustedPanel(sender, chrome.runtime)) return false;
-  if (message?.type === 'auth.configuration') {
-    reply({ ok: true, result: { redirectUrl: chrome.identity.getRedirectURL('auth/callback') + String.raw`\?attempt=*` } });
-    return false;
-  }
   (async () => {
     try { reply({ ok: true, result: await handleAuthMessage(message, await getController()) }); }
     catch (error) { reply({ ok: false, error: error instanceof AuthError ? error.code : 'auth_unavailable' }); }
