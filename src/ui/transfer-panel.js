@@ -1,5 +1,5 @@
 (() => {
-  const {t}=globalThis.ClatriI18n;
+  const {t,locale}=globalThis.ClatriI18n;
   const kit=globalThis.ClatriKit;
   const el=id=>document.getElementById(id);
   let state=null, signedIn=false, busy=false, timer=null, generation=0;
@@ -55,7 +55,7 @@
       state=result;
       el('transfer-skeleton').hidden=true;
       el('destination').hidden=!state.capture;
-      el('capture-summary').textContent=state.capture ? t('{count} transactions · ending {last4} · {from} to {to}',{count:state.capture.count,last4:state.capture.last4,from:state.capture.coverage.start,to:state.capture.coverage.end}) : t('In your bank, open your transactions and click “Send to Clatri”.');
+      el('capture-summary').textContent=state.capture ? t('{count} transactions · ending {last4} · {from} to {to}',{count:state.capture.count,last4:state.capture.last4,from:day(state.capture.coverage.start),to:day(state.capture.coverage.end)}) : t('In your bank, open your transactions and click “Send to Clatri”.');
       // Nothing loaded yet: the bank panel says so next to its Load button.
       if(state.capture && !state.capture.count) el('capture-summary').textContent='';
       if(state.capture?.count && !state.capture.coverage.complete) el('capture-summary').textContent+=' '+t('The bank did not confirm the end of the list. Only the received transactions will be sent.');
@@ -69,28 +69,62 @@
       else status('');
     } catch(error) { if(version===generation) {el('transfer-skeleton').hidden=true;el('destination').hidden=true;el('capture-summary').textContent='';fail(error);} }
   }
+  // Dates and money in the reader's language. A booking date is a calendar day,
+  // so it is built from its parts: parsing the ISO string would shift it by the
+  // browser's UTC offset.
+  const formats=locale()==='es' ? 'es-CO' : 'en-US';
+  function day(iso) {
+    const [y,m,d]=String(iso || '').split('-').map(Number);
+    if(!y || !m || !d) return '';
+    return new Intl.DateTimeFormat(formats,{day:'numeric',month:'short',year:'numeric'}).format(new Date(y,m-1,d));
+  }
+  function moment(timestamp) {
+    const date=new Date(timestamp);
+    return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(formats,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}).format(date);
+  }
+  function amount(item) {
+    if(item.amount==null || !item.currency) return '';
+    try { return (item.direction==='outgoing' ? '−' : '+')+new Intl.NumberFormat(formats,{style:'currency',currency:item.currency,maximumFractionDigits:2}).format(Number(item.amount)); }
+    catch { return ''; }
+  }
+  const node=(tag,className,text)=>{const made=document.createElement(tag);if(className) made.className=className;if(text!=null) made.textContent=text;return made;};
+
+  /** One card per movement that needs a decision: the bank row, why it stopped, and what it may duplicate. */
   function issueRow(job,item,version) {
-    const li=document.createElement('li');
-    li.textContent=item.description+' — '+t(reasons[item.reason] || 'This transaction needs attention.');
+    const li=node('li','issue');
+    const head=node('div','issue-head');head.append(node('span','issue-title',item.description),node('span','issue-amount',amount(item)));
+    const why=t(reasons[item.reason] || 'This transaction needs attention.');
+    li.append(head,node('p','issue-meta',[day(item.booking_date),why].filter(Boolean).join(' · ')));
     if(item.reason!=='possible_duplicate') return li;
-    const controls=document.createElement('div');controls.className='issue-actions';
-    const buttons=document.createElement('div');buttons.className='row';
-    const distinct=document.createElement('button');distinct.className='ghost small';distinct.textContent=t('Record as a separate transaction');
-    const link=document.createElement('button');link.className='ghost small';link.textContent=t('Already in Clatri');link.disabled=true;
-    const choose=document.createElement('div');choose.className='picker';choose.setAttribute('role','group');choose.setAttribute('aria-label',t('Existing transaction'));
-    kit.picker.fill(choose,(item.candidates || []).map(candidate=>({value:candidate.id,label:candidate.description || candidate.occurred_at})),'',{placeholder:t('Choose an existing transaction'),autoSelect:false});
-    kit.picker.wire(choose,{grow:document.body});
-    choose.addEventListener('change',()=>{link.disabled=!choose.value;});
-    buttons.append(distinct);
-    if(item.candidates?.length){controls.append(choose);buttons.append(link);}
-    controls.append(buttons);
+
+    const candidates=item.candidates || [];
+    // The usual case is a single match; it starts selected so one click settles it.
+    let chosen=candidates.length===1 ? candidates[0].id : '';
+    const distinct=node('button','ghost small',t('Record as a separate transaction'));
+    const link=node('button','ghost small',t('Already in Clatri'));link.disabled=!chosen;
+    if(candidates.length) {
+      li.append(node('p','label',t('Same date and amount as one you already have:')));
+      const group=node('div','choices');group.setAttribute('role','radiogroup');group.setAttribute('aria-label',t('Existing transaction'));
+      for(const candidate of candidates) {
+        const option=node('button','choice');option.type='button';option.setAttribute('role','radio');option.setAttribute('aria-checked',String(candidate.id===chosen));
+        option.append(node('span','choice-mark'),node('span','text',candidate.description || t('No description')),node('span','hint',moment(candidate.occurred_at)));
+        option.addEventListener('click',()=>{
+          chosen=candidate.id;link.disabled=false;
+          for(const other of group.children) other.setAttribute('aria-checked',String(other===option));
+        });
+        group.append(option);
+      }
+      li.append(group);
+    }
+    const actions=node('div','issue-actions');
+    if(candidates.length) actions.append(link);
+    actions.append(distinct);li.append(actions);
     async function resolve(action) {
       distinct.disabled=true;link.disabled=true;
-      try {await message('transfer.resolve',{id:job.id,item_key:item.item_key,expected_version:item.version,action,target_event_id:action==='same_existing' ? choose.value : null});await poll(job.id,version);}
+      try {await message('transfer.resolve',{id:job.id,item_key:item.item_key,expected_version:item.version,action,target_event_id:action==='same_existing' ? chosen : null});await poll(job.id,version);}
       catch {status(t('The transaction changed. Refresh its status before retrying.'),'error');}
     }
     distinct.addEventListener('click',()=>resolve('distinct'));link.addEventListener('click',()=>resolve('same_existing'));
-    li.append(controls);
     return li;
   }
   async function poll(id,version=generation) {

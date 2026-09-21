@@ -64,7 +64,7 @@
   chrome.runtime.onMessage.addListener((message,sender)=>{
     if(sender.id!==chrome.runtime.id || message?.type!=='frame.resize' || !Number.isInteger(message.height))return;
     const frame=document.getElementById('clatri-root')?.shadowRoot?.getElementById('transfer-frame');
-    if(frame)frame.style.height=Math.max(96,Math.min(900,message.height))+'px';
+    if(frame)frame.style.height=Math.max(96,Math.min(2400,message.height))+'px';
   });
   try {
     document.documentElement.dataset.clatriLocale = chrome.i18n?.getUILanguage?.() || navigator.language || "en";
