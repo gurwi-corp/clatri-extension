@@ -25,7 +25,6 @@
     countryCode: countries[0].code,
     bankId: engine?.bank?.id || registry.forCountry(countries[0].code)[0]?.id || null,
     accountNumber: "",
-    showDiagnostics: false,
     from: firstOfMonth(),
     to: today(),
     busy: false,
@@ -184,19 +183,6 @@
       .msg.ok { color: #17803d; }
       .msg:empty { display: none; }
 
-      .link { background: none; border: 0; padding: 0; font-size: 11.5px; color: #797e84; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-      .link:hover { color: #1a1a1a; }
-
-      .diag { border-top: 1px solid rgba(0,0,0,.06); padding-top: 11px; display: flex; flex-direction: column; gap: 8px; }
-      .diag-head { display: flex; align-items: center; justify-content: space-between; }
-      .diag-list {
-        margin: 0; max-height: 132px; overflow: auto; font-size: 10.5px; line-height: 1.6;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #797e84;
-        background: #f6f7f8; border-radius: 8px; padding: 8px 9px;
-      }
-      .diag-list div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .diag-list .badge { color: #17803d; }
-
       @media (prefers-color-scheme: dark) {
         .launcher, .panel { background: #1b1c1e; color: #f2f3f4; border-color: rgba(255,255,255,.11); }
         header { border-bottom-color: rgba(255,255,255,.08); }
@@ -217,7 +203,7 @@
         input:focus { background: #2a2b2e; border-color: rgba(255,255,255,.32); }
         input:disabled { color: #7d8288; }
         input:disabled::-webkit-calendar-picker-indicator { opacity: .35; cursor: not-allowed; }
-        .status, .diag-list { background: #232426; color: #b6babe; }
+        .status { background: #232426; color: #b6babe; }
         .chip, .ghost, .icon { background: #232426; color: #d5d7da; border-color: rgba(255,255,255,.13); }
         .chip:hover:not(:disabled), .ghost:hover:not(:disabled), .icon:hover:not(:disabled) { background: #2c2d30; color: #fff; }
         .icon:disabled { color: #5f6469; }
@@ -229,7 +215,6 @@
         .primary:disabled { background: #3a3b3e; color: #7d8288; }
         .ghost:disabled { color: #5f6469; }
         .close:hover { background: rgba(255,255,255,.08); color: #fff; }
-        .diag { border-top-color: rgba(255,255,255,.08); }
         .msg.error { color: #ff8f6b; }
         .msg.ok { color: #5fd08a; }
       }
@@ -258,8 +243,6 @@
             </div>
           </div>
 
-          <a class="link" href="https://github.com/gurwi-corp/clatri-extension/blob/main/docs/supported-institutions.md" target="_blank" rel="noopener noreferrer">${t("View supported institutions")}</a>
-
           <div class="status"><span class="dot" id="dot"></span><span class="text" id="status"></span></div>
 
           <div>
@@ -284,7 +267,6 @@
             <button class="chip" data-preset="this-month">${t("This month")}</button>
             <button class="chip" data-preset="last-month">${t("Last month")}</button>
             <button class="chip" data-preset="last-3">${t("Last 3 months")}</button>
-            <button class="chip" data-preset="this-year">${t("This year")}</button>
           </div>
 
           <div>
@@ -304,14 +286,6 @@
 
           <p class="msg" id="msg"></p>
 
-          <div class="diag">
-            <div class="diag-head">
-              <button class="link" id="toggleDiag">${t("Show what Clatri sees")}</button>
-              <span class="link" id="diagCount" style="text-decoration:none;cursor:default"></span>
-            </div>
-            <div class="diag-list" id="diagList" hidden></div>
-            <button class="ghost" id="reportBtn" hidden>${t("Copy debug report")}</button>
-          </div>
         </div>
       </div>
 
@@ -329,7 +303,7 @@
   const panel = root.querySelector(".panel");
 
   // --- dates ----------------------------------------------------------------
-  // Ranges live in shape.js so the panel and the diagnostics agree. Declarations
+  // Ranges live in shape.js so the panel and date helpers agree. Declarations
   // rather than const arrows on purpose: `ui` above calls them as it is built,
   // and a const would still be in its temporal dead zone at that point.
 
@@ -600,41 +574,6 @@
     const message = el("msg");
     message.textContent = ui.message;
     message.className = `msg${ui.tone === "error" ? " error" : ui.tone === "ok" ? " ok" : ""}`;
-
-    renderDiagnostics();
-  }
-
-  function renderDiagnostics() {
-    const state = engine?.state;
-    const seen = state?.seen || 0;
-    el("diagCount").textContent = t("Requests detected: {count}", { count: seen });
-    el("toggleDiag").textContent = ui.showDiagnostics ? t("Hide details") : t("Show what Clatri sees");
-
-    const list = el("diagList");
-    list.hidden = !ui.showDiagnostics;
-    el("reportBtn").hidden = !ui.showDiagnostics;
-    if (!ui.showDiagnostics) return;
-
-    const templates = Object.keys(state?.templates || {});
-    const summary = [
-      `${t("Session")}: ${t(state?.headers ? "Captured" : "Not captured")}`,
-      `${t("Accounts")}: ${state?.accounts?.length || 0}`,
-      `${t("Transaction request")}: ${t(templates.length ? "Captured" : "Rebuilt from the accounts request")}`,
-      `${t("Endpoints")}: ${Object.keys(state?.headersByUrl || {}).length}`,
-      "",
-    ];
-    const rows = (state?.log || []).slice(-14).reverse().map((entry) => {
-      const marks = [
-        entry.auth ? "auth" : "",
-        entry.accounts ? `${entry.accounts} acct` : "",
-        entry.transactions ? `${entry.transactions} tx` : "",
-      ].filter(Boolean);
-      return `${escapeHtml(entry.url)}${marks.length ? `  <span class="badge">[${marks.join(" ")}]</span>` : ""}`;
-    });
-
-    list.innerHTML = [...summary, ...(rows.length ? rows : [t("no bank requests observed yet")])]
-      .map((line) => `<div>${line}</div>`)
-      .join("");
   }
 
   function say(message, tone = "neutral") {
@@ -816,20 +755,6 @@
     ui.message = "";
     // A card locks the date fields and reads its own template, so repaint.
     render();
-  });
-
-  el("toggleDiag").addEventListener("click", () => {
-    ui.showDiagnostics = !ui.showDiagnostics;
-    renderDiagnostics();
-  });
-
-  el("reportBtn").addEventListener("click", async () => {
-    try {
-      await exporter.copy(NS.report ? NS.report() : "no report available");
-      say(t("Debug report copied. It contains field names only, no values."), "ok");
-    } catch {
-      say(t("Could not reach the clipboard."), "error");
-    }
   });
 
   el("from").addEventListener("change", (event) => {
