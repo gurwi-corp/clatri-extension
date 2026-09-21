@@ -50,7 +50,7 @@ These are **Supabase glob patterns**, not URLs to open. The backslash makes `?`
 a literal query separator; `*` allows the random attempt identifier. Each host
 belongs to one extension ID. The worker separately verifies the exact origin,
 path, attempt and PKCE code, rejecting fragment tokens and stale callbacks.
-The dev panel shows its own pattern for copying. Do not add a wildcard for all
+The build command prints the pattern for copying. Do not add a wildcard for all
 `chromiumapp.org` subdomains. The user confirmed adding the return URLs in Supabase on 2026-09-20. The
 agent has not independently verified the allow-list or completed a real login.
 
@@ -94,7 +94,7 @@ Apple Services ID just because it is a Chrome extension.
    expiry/refresh and logout. The SDK refreshes a persisted session on demand;
    a single service worker owns it. Other Clatri sessions are not signed out.
 5. If redirected to the website instead of Chrome, check the allow-list against
-   the exact ID and query pattern shown in the dev panel. If the provider says
+   the exact ID and query pattern printed by the build command. If the provider says
    `redirect_uri_mismatch`/`invalid_client`, check its web callback/client secret.
 
 The side panel renders only verified profile fields. Tokens never appear in

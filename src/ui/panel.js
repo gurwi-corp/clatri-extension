@@ -6,6 +6,7 @@
   "use strict";
   const NS = (window.__clatri = window.__clatri || {});
   const { registry, engine, exporter, shape } = NS;
+  const { t, locale } = globalThis.ClatriI18n;
   if (!registry || !exporter || !shape || NS.panel) return;
   if (window.top !== window.self) return;
 
@@ -16,6 +17,7 @@
 
   const host = document.createElement("div");
   host.id = "clatri-root";
+  host.lang = locale();
   const root = host.attachShadow({ mode: "open" });
 
   const ui = {
@@ -239,59 +241,60 @@
           ${logoTag(32)}
           <div class="titles">
             <h1>Clatri</h1>
-            <p class="sub">Export bank transactions</p>
+            <p class="sub">${t("Export bank transactions")}</p>
           </div>
-          <button class="close" title="Close">&times;</button>
+          <button class="close" title="${t("Close")}">&times;</button>
         </header>
 
         <div class="body">
           <div class="row">
             <div>
-              <span class="label">Country</span>
+              <span class="label">${t("Country")}</span>
               <div class="picker" id="country" aria-expanded="false"></div>
             </div>
             <div>
-              <span class="label">Bank</span>
+              <span class="label">${t("Bank")}</span>
               <div class="picker" id="bank" aria-expanded="false"></div>
             </div>
           </div>
 
+          <a class="link" href="https://github.com/gurwi-corp/clatri-extension/blob/main/docs/supported-institutions.md" target="_blank" rel="noopener noreferrer">${t("View supported institutions")}</a>
+
           <div class="status"><span class="dot" id="dot"></span><span class="text" id="status"></span></div>
 
           <div>
-            <span class="label" id="accountLabel">Account</span>
+            <span class="label" id="accountLabel">${t("Account")}</span>
             <div class="picker" id="account" aria-expanded="false"></div>
           </div>
 
           <div class="row">
             <div>
-              <span class="label">From</span>
+              <span class="label">${t("From")}</span>
               <input id="from" type="date" />
             </div>
             <div>
-              <span class="label">To</span>
+              <span class="label">${t("To")}</span>
               <input id="to" type="date" />
             </div>
           </div>
 
-          <p class="msg" id="rangeNote" hidden>The bank does not filter this card's movements by
-            date. Clatri downloads everything it offers.</p>
+          <p class="msg" id="rangeNote" hidden>${t("The bank does not filter this card’s movements by date. Clatri downloads everything it offers.")}</p>
 
           <div class="presets">
-            <button class="chip" data-preset="this-month">This month</button>
-            <button class="chip" data-preset="last-month">Last month</button>
-            <button class="chip" data-preset="last-3">Last 3 months</button>
-            <button class="chip" data-preset="this-year">This year</button>
+            <button class="chip" data-preset="this-month">${t("This month")}</button>
+            <button class="chip" data-preset="last-month">${t("Last month")}</button>
+            <button class="chip" data-preset="last-3">${t("Last 3 months")}</button>
+            <button class="chip" data-preset="this-year">${t("This year")}</button>
           </div>
 
           <div>
-            <span class="label">Format</span>
+            <span class="label">${t("Format")}</span>
             <div class="picker" id="format" aria-expanded="false"></div>
           </div>
 
           <div class="actions">
-            <button class="primary" id="run">Download CSV</button>
-            <button class="icon" id="copy" title="Copy to clipboard" aria-label="Copy to clipboard">
+            <button class="primary" id="run">${t("Download CSV")}</button>
+            <button class="icon" id="copy" title="${t("Copy to clipboard")}" aria-label="${t("Copy to clipboard")}">
               <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="5.5" y="5.5" width="8" height="8" rx="1.8"/>
                 <path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>
@@ -303,11 +306,11 @@
 
           <div class="diag">
             <div class="diag-head">
-              <button class="link" id="toggleDiag">Show what Clatri sees</button>
+              <button class="link" id="toggleDiag">${t("Show what Clatri sees")}</button>
               <span class="link" id="diagCount" style="text-decoration:none;cursor:default"></span>
             </div>
             <div class="diag-list" id="diagList" hidden></div>
-            <button class="ghost" id="reportBtn" hidden>Copy debug report</button>
+            <button class="ghost" id="reportBtn" hidden>${t("Copy debug report")}</button>
           </div>
         </div>
       </div>
@@ -366,7 +369,7 @@
 
   function formatAmount(value, currency) {
     try {
-      return new Intl.NumberFormat("en-US", {
+      return new Intl.NumberFormat(locale(), {
         style: "currency",
         currency: currency || "USD",
         maximumFractionDigits: 0,
@@ -512,7 +515,7 @@
       console.error("[clatri] render failed", error);
       try {
         const message = el("msg");
-        message.textContent = `Panel error: ${error.message}`;
+        message.textContent = t("The panel could not be updated. Please reload the page.");
         message.className = "msg error";
       } catch {}
     }
@@ -536,8 +539,8 @@
     // Products show up one call at a time: the savings list first, the cards
     // once the portal asks for them. Say how many are in the list right now.
     el("accountLabel").textContent = accounts.length
-      ? `Account · ${accounts.length} detected`
-      : "Account";
+      ? t("Account · {count} detected", { count: accounts.length })
+      : t("Account");
 
     if (accounts.length && !accounts.some((account) => account.number === ui.accountNumber)) {
       ui.accountNumber = accounts[0].number;
@@ -547,13 +550,13 @@
       accounts.map((account) => ({
         value: account.number,
         label:
-          `${account.typeLabel || "Account"} ${displayNumber(account.number)}` +
+          `${t(account.typeLabel || "Account")} ${displayNumber(account.number)}` +
           (account.balance === null || account.balance === undefined
             ? ""
             : ` · ${formatAmount(account.balance, account.currency)}`),
       })),
       ui.accountNumber,
-      { placeholder: "No accounts detected yet" }
+      { placeholder: t("No accounts detected yet") }
     );
 
     el("dot").classList.toggle("live", live);
@@ -561,17 +564,17 @@
 
     const bank = currentBank();
     if (!bankIsHere()) {
-      el("status").textContent = `Open ${bank ? bank.name : "the bank"} to export from it`;
+      el("status").textContent = t("Open {bank} to export from it", { bank: bank ? bank.name : t("the bank") });
     } else if (live) {
       const chosen = selectedAccount();
       const exact = Boolean(chosen && engine?.templateFor && engine.templateFor(chosen));
       el("status").textContent = !accounts.length
-        ? "Session detected · open Tus productos so Clatri can list your accounts"
+        ? t("Session detected · open Tus productos so Clatri can list your accounts")
         : exact
-          ? `Ready · ${accounts.length} account${accounts.length === 1 ? "" : "s"}, exact request copied`
-          : `Ready · ${accounts.length} account${accounts.length === 1 ? "" : "s"}, using a rebuilt request`;
+          ? t("Ready · accounts: {count}, exact request copied", { count: accounts.length })
+          : t("Ready · accounts: {count}, using a rebuilt request", { count: accounts.length });
     } else {
-      el("status").textContent = bank?.hint || "Waiting for the bank session";
+      el("status").textContent = t(bank?.hint || "Waiting for the bank session");
     }
 
     // A card cannot be queried by date at this bank. Lock the range so the
@@ -591,7 +594,7 @@
     const runnable = live && !ui.busy && Boolean(selectedAccount());
     fillSelect(el("format"), FORMATS.map((entry) => ({ value: entry.id, label: entry.label })), ui.format);
     el("run").disabled = !runnable;
-    el("run").textContent = ui.busy ? "Working…" : `Download ${formatOf(ui.format).label}`;
+    el("run").textContent = ui.busy ? t("Working…") : t("Download {format}", { format: formatOf(ui.format).label });
     el("copy").disabled = !runnable;
 
     const message = el("msg");
@@ -604,8 +607,8 @@
   function renderDiagnostics() {
     const state = engine?.state;
     const seen = state?.seen || 0;
-    el("diagCount").textContent = `${seen} request${seen === 1 ? "" : "s"} seen`;
-    el("toggleDiag").textContent = ui.showDiagnostics ? "Hide details" : "Show what Clatri sees";
+    el("diagCount").textContent = t("Requests detected: {count}", { count: seen });
+    el("toggleDiag").textContent = ui.showDiagnostics ? t("Hide details") : t("Show what Clatri sees");
 
     const list = el("diagList");
     list.hidden = !ui.showDiagnostics;
@@ -614,10 +617,10 @@
 
     const templates = Object.keys(state?.templates || {});
     const summary = [
-      `session ....... ${state?.headers ? "captured" : "not captured"}`,
-      `accounts ...... ${state?.accounts?.length || 0}`,
-      `tx template ... ${templates.length ? `captured (${templates.join(", ")})` : "rebuilt from the accounts call"}`,
-      `header sets ... ${Object.keys(state?.headersByUrl || {}).length} endpoints`,
+      `${t("Session")}: ${t(state?.headers ? "Captured" : "Not captured")}`,
+      `${t("Accounts")}: ${state?.accounts?.length || 0}`,
+      `${t("Transaction request")}: ${t(templates.length ? "Captured" : "Rebuilt from the accounts request")}`,
+      `${t("Endpoints")}: ${Object.keys(state?.headersByUrl || {}).length}`,
       "",
     ];
     const rows = (state?.log || []).slice(-14).reverse().map((entry) => {
@@ -629,7 +632,7 @@
       return `${escapeHtml(entry.url)}${marks.length ? `  <span class="badge">[${marks.join(" ")}]</span>` : ""}`;
     });
 
-    list.innerHTML = [...summary, ...(rows.length ? rows : ["no bank requests observed yet"])]
+    list.innerHTML = [...summary, ...(rows.length ? rows : [t("no bank requests observed yet")])]
       .map((line) => `<div>${line}</div>`)
       .join("");
   }
@@ -685,16 +688,16 @@
     if (!account) return;
     const locked = datesLocked(account);
     if (!locked && ui.from > ui.to) {
-      say("The start date is after the end date.", "error");
+      say(t("The start date is after the end date."), "error");
       return;
     }
 
     if (mode === "copy" && ui.results && ui.resultsKey === exportKey(account)) {
       try {
         await deliver("copy", ui.results, ui.resultsContext);
-        say(`${ui.results.length} transactions copied as ${formatOf(ui.format).label}.`, "ok");
+        say(t("{count} transactions copied as {format}.", { count: ui.results.length, format: formatOf(ui.format).label }), "ok");
       } catch {
-        say("Could not reach the clipboard.", "error");
+        say(t("Could not reach the clipboard."), "error");
       }
       return;
     }
@@ -702,7 +705,7 @@
     ui.busy = true;
     ui.results = null;
     ui.resultsKey = null;
-    say("Requesting transactions…");
+    say(t("Requesting transactions…"));
 
     try {
       const { transactions, rangeApplied, fetched, windows, truncated, covered } = await engine.fetchRange({
@@ -710,7 +713,7 @@
         from: ui.from,
         to: ui.to,
         onProgress: ({ total, page, from, to }) =>
-          say(locked ? `${total} transactions so far… (page ${page})` : `${total} transactions so far… (${from} to ${to})`),
+          say(locked ? t("{count} transactions so far… (page {page})", { count: total, page }) : t("{count} transactions so far… ({from} to {to})", { count: total, from, to })),
       });
 
       ui.busy = false;
@@ -719,20 +722,15 @@
       ui.resultsKey = truncated ? null : exportKey(account);
 
       // Without a date filter to rewrite, Clatri only gets the bank's own window.
-      const teachRange =
-        " Clatri found no date filter in the request the bank made, so it can only" +
-        " read the range the bank chose. Set Desde and Hasta on the bank's own search," +
-        " press the magnifier once, then come back.";
+      const teachRange = t(" Clatri found no date filter in the bank request, so it can only read the range the bank chose. Set Desde and Hasta in the bank’s search, press search once, then come back.");
 
       // A partial ledger is more dangerous than no ledger: importing it looks
       // successful. Keep the recovered count in the message, but do not create
       // a file or keep the rows around for copying.
       if (truncated) {
-        const span = covered ? ` The bank returned rows from ${covered.from} to ${covered.to}.` : "";
+        const span = covered ? t(" The bank returned rows from {from} to {to}.", covered) : "";
         say(
-          `Export cancelled because the bank did not complete every date window.` +
-            `${span} ${transactions.length} transactions were recovered but no partial file was created. ` +
-            "Retry with a shorter range.",
+          t("Export cancelled because the bank did not complete every date window.{span} {count} transactions were recovered but no partial file was created. Retry with a shorter range.", { span, count: transactions.length }),
           "error"
         );
         return;
@@ -741,10 +739,10 @@
       if (!transactions.length) {
         say(
           locked
-            ? "The bank has no movements for this card."
+            ? t("The bank has no movements for this card.")
             : rangeApplied
-              ? "No transactions in that range."
-              : `The bank returned ${fetched} transactions, none inside your dates.${teachRange}`,
+              ? t("No transactions in that range.")
+              : t("The bank returned {count} transactions, none inside your dates.{help}", { count: fetched, help: teachRange }),
           "neutral"
         );
         return;
@@ -753,29 +751,30 @@
       try {
         await deliver(mode, transactions, ui.resultsContext);
       } catch {
-        say("Could not reach the clipboard.", "error");
+        say(t("Could not reach the clipboard."), "error");
         return;
       }
 
       const split =
         windows > 1
-          ? ` Clatri checked ${windows} smaller date windows to avoid the bank's response limits.`
+          ? t(" Clatri checked {count} smaller date windows to avoid the bank’s response limits.", { count: windows })
           : "";
 
       // State the span actually covered, so a gap at either edge is visible here
       // rather than only after opening the file.
-      const span = covered ? ` Transaction dates: ${covered.from} to ${covered.to}.` : "";
+      const span = covered ? t(" Transaction dates: {from} to {to}.", covered) : "";
 
-      const verb = mode === "copy" ? `copied as ${formatOf(ui.format).label}` : "exported";
-      say(
-        `${transactions.length} transactions ${verb}.${span}${split}` +
-          `${rangeApplied ? "" : teachRange}`,
+      const resultMessage = mode === "copy"
+        ? t("{count} transactions copied as {format}.", { count: transactions.length, format: formatOf(ui.format).label })
+        : t("{count} transactions exported.", { count: transactions.length });
+      say(resultMessage + span + split + (rangeApplied ? "" : teachRange),
         !rangeApplied ? "neutral" : "ok"
       );
     } catch (error) {
       ui.busy = false;
       ui.results = null;
-      say(error.message || "Something went wrong.", "error");
+      const status = /^The bank returned (\d+)\.$/.exec(error.message || "");
+      say(status ? t("The bank returned {status}.", { status: status[1] }) : t(error.message || "Something went wrong."), "error");
     }
   }
 
@@ -827,9 +826,9 @@
   el("reportBtn").addEventListener("click", async () => {
     try {
       await exporter.copy(NS.report ? NS.report() : "no report available");
-      say("Debug report copied. It contains field names only, no values.", "ok");
+      say(t("Debug report copied. It contains field names only, no values."), "ok");
     } catch {
-      say("Could not reach the clipboard.", "error");
+      say(t("Could not reach the clipboard."), "error");
     }
   });
 

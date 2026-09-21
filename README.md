@@ -69,12 +69,10 @@ then copy the exact request your bank just made instead of rebuilding one.
 
 ## Supported banks
 
-| Country | Bank | Accounts | Credit cards | Transactions |
-|---|---|:--:|:--:|:--:|
-| 🇨🇴 Colombia | Bancolombia | ✅ | ✅ | ✅ |
-
-The country and bank pickers are already in the interface, waiting. Yours could
-be the next row.
+Bancolombia in Colombia is the first supported institution. See the
+[compatibility list by country](docs/supported-institutions.md) for products,
+export support and current limitations. Contributions for more institutions
+and countries are welcome.
 
 ## Add your bank
 
@@ -248,3 +246,10 @@ A bank page's two identical rows are kept as two occurrences. Retrying a split
 window replaces its parent rows instead of deduplicating by amount/date/text.
 Generic bank errors now leave a capture explicitly incomplete, even after a
 short page. Only explicit pagination/empty-page evidence completes a capture.
+
+### Interface language
+
+The side panel and bank export panel follow the browser UI language automatically.
+Spanish regional variants use Spanish; English and other languages use English.
+Reload the extension and the bank tab after changing the browser language.
+Bank descriptions, transaction data and CSV/JSON field names keep their original format.
