@@ -254,3 +254,29 @@ select:focus-visible {outline:3px solid #7431ff;outline-offset:3px;}
 
 .issue-actions {display:grid;gap:4px;margin-top:4px;}
 .issue-actions .text-button {margin-top:0;}
+
+.logout-button {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 14px;margin:0 0 16px;border:1px solid #d5d8dd;border-radius:10px;background:transparent;color:#565b60;font-weight:550;min-height:44px;}
+.logout-button svg {width:18px;height:18px;}
+.logout-button:hover {background:#f6f7f8;color:#1a1a1a;}
+.open-app {display:block;text-align:center;color:#6b35bd;text-underline-offset:3px;}
+.bank-view {min-height:0;background:#fff;}
+.bank-view header {display:none;}
+.bank-view main {padding:16px;}
+.bank-view h1 {font-size:21px;}
+.bank-view .intro {margin-bottom:16px;}
+.bank-session {display:flex;align-items:center;gap:8px;font-size:12px;color:#565b60;overflow-wrap:anywhere;}
+.bank-session p {margin:0;min-width:0;}
+.bank-view .transfer {border:0;padding:0;margin:16px 0;}
+.bank-view .transfer label {margin:12px 0 6px;font-size:13px;}
+.bank-view .transfer h2 {font-size:17px;}
+.bank-view .logout-button {margin-bottom:0;}
+.bank-view #refresh-transfer {margin-top:0;}
+@media(prefers-color-scheme:dark) {
+ .bank-view {background:#1b1c1e;color:#f2f3f4;color-scheme:dark;}
+ .bank-view .muted,.bank-view .bank-session,.bank-view .text-button {color:#b6babe;}
+ .bank-view .transfer select,.bank-view input {background:#232426;color:#f2f3f4;border-color:#424448;}
+ .bank-view .logout-button {color:#b6babe;border-color:#424448;}
+ .bank-view .logout-button:hover {background:#232426;color:white;}
+ .bank-view #message {background:#232426;}
+ .bank-view .primary {background:#f2f3f4;color:#1b1c1e;}
+}

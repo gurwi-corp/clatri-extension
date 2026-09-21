@@ -290,6 +290,7 @@
           </div>
 
           <button class="primary" id="sendClatri">${t("Send to Clatri")}</button>
+          <div id="transfer-slot"></div>
           <div class="actions">
             <button class="primary" id="run">${t("Download CSV")}</button>
             <button class="icon" id="copy" title="${t("Copy to clipboard")}" aria-label="${t("Copy to clipboard")}">
@@ -499,7 +500,11 @@
   }
 
   /** A thrown render must never leave a dead panel: show the failure in place. */
+  let previousSelection = null;
   function render() {
+    const selection=exportKey(selectedAccount());
+    if(previousSelection!==null && previousSelection!==selection) window.postMessage({channel:'clatri-clear-transfer'},location.origin);
+    previousSelection=selection;
     try {
       paint();
     } catch (error) {
@@ -639,6 +644,7 @@
       return;
     }
     exporter.download(text, exporter.filename(context, format.id), format.mime);
+    if(format.id==='csv') window.postMessage({channel:'clatri-csv-generated',product:selectedAccount()?.kind==='card' ? 'card' : 'deposit'},location.origin);
   }
 
   const exportKey = (account) => `${ui.countryCode}|${ui.bankId}|${account?.number || ""}|${ui.from}|${ui.to}`;
@@ -706,7 +712,7 @@
           status:row.bankType === 'PENDIENTE' ? 'pending' : 'completed', timezone:'America/Bogota',
         }));
         window.postMessage({channel:'clatri-stage-transfer',capture:{institution:'co-bancolombia',product:account.kind === 'card' ? 'card' : 'deposit',number:account.number,from:locked ? covered.from : ui.from,to:locked ? covered.to : ui.to,complete:!truncated,items}},location.origin);
-        say(t("Choose your entity and destination account in Clatri’s extension panel. If it did not open, click the Clatri icon in your browser."));
+        say(t("Choose the destination below to send your transactions."));
         return;
       }
       if (truncated && completion !== "unknown") {

@@ -24,6 +24,7 @@ function render(result) {
   byId('email').textContent = result.user?.email || t("Your Clatri account");
   byId('code').value = '';
   globalThis.ClatriTransfer?.authChanged(result.status === 'signed_in');
+  if(result.status==='signed_in') chrome.runtime.sendMessage({type:'usage.active'}).catch(()=>{});
   if (result.status === 'mfa_required') byId('code').focus();
   if (result.revocation_pending) notify(t("Signed out of this extension. Without a connection, we couldn’t confirm revocation on the server."));
 }
@@ -50,3 +51,14 @@ for (const id of ['logout', 'mfa-logout']) byId(id).addEventListener('click', ()
 byId('mfa-form').addEventListener('submit', event => { event.preventDefault(); request('auth.verifyMfa', { code: byId('code').value }); });
 byId('retry').addEventListener('click', () => request('auth.status'));
 request('auth.status');
+
+// Only extension runtime carries layout messages; no profile or destinations
+// are posted into the bank's window messaging channel.
+if (document.body?.classList.contains('bank-view')) {
+  let lastHeight=0;
+  new ResizeObserver(()=>{
+    const height=Math.min(900,Math.max(200,Math.ceil(document.body.scrollHeight)));
+    if(height===lastHeight)return;lastHeight=height;
+    chrome.runtime.sendMessage({type:'frame.resize',height}).catch(()=>{});
+  }).observe(document.body);
+}

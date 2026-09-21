@@ -11,7 +11,7 @@ const origin = new URL(config.supabaseUrl);
 if (origin.protocol !== 'https:' || origin.pathname !== '/' || !config.supabasePublishableKey.startsWith('sb_publishable_')) throw new Error('Only a public Supabase HTTPS configuration is allowed');
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
-for (const path of ['src', 'icons', '_locales', 'sidepanel.html']) await cp(resolve(root, path), resolve(out, path), { recursive: true });
+for (const path of ['src', 'icons', '_locales', 'sidepanel.html', 'bank-transfer.html']) await cp(resolve(root, path), resolve(out, path), { recursive: true });
 // Build the worker with dependencies bundled locally. Never load remote code.
 await build({ entryPoints: [resolve(root, 'src/background/service-worker.js')], outfile: resolve(out, 'src/background/service-worker.js'), bundle: true, format: 'esm', platform: 'browser', target: 'chrome116', minify: false });
 const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
