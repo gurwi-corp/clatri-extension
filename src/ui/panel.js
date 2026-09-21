@@ -103,7 +103,8 @@
       .stack { display: grid; gap: 14px; }
       .presets { display: flex; flex-wrap: wrap; gap: 6px; }
       .actions { display: flex; gap: 8px; }
-      .bank-help { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--c-ink-2); }
+      /* Instructions come as one string; blank lines in it separate the steps. */
+      .bank-help { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--c-ink-2); white-space: pre-line; }
 
       @media (max-width: 420px) {
         .wrap { right: 12px; }
