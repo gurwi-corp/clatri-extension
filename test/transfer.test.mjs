@@ -9,7 +9,7 @@ function fixture() {
   const area=store=>({get:async key=>({[key]:store[key]}),set:async values=>Object.assign(store,values)});
   const chrome={tabs:{query:async()=>[{id:7}]},storage:{session:area(sessionStore),local:area(localStore)},runtime:{getManifest:()=>({version:'0.12.0'})}};
   const client={auth:{getSession:async()=>({data:{session:{access_token:'synthetic-jwt',expires_at:Date.now()/1000+3600,user:{id:'user'}}}})}};
-  const entities=[{id:'entity',accounts:[{id:'account',name:'Checking',currency:'COP'}],cards:[]}];
+  const entities=[{id:'entity',accounts:[{id:'account',name:'Checking',currency:'COP'},{id:'account-2',name:'Savings',currency:'COP'}],cards:[]}];
   const api=async(url,init)=>{requests.push({url,init});return {ok:true,json:async()=>url.endsWith('/context') ? {entities} : url.endsWith('/bindings') ? {id:'binding'} : {id:'11111111-2222-4333-8444-555555555555',status:'queued'}};};
   return {transfer:createTransfer({chrome,getClient:async()=>client,apiBase:'https://api.example.test/extension',fetcher:api}),requests,sessionStore,localStore};
 }
@@ -34,7 +34,7 @@ test('trusted send chooses an authorized target and delivers one exact envelope'
   await f.transfer.handle({type:'transfer.send',capture_id:current.id,entity_id:'entity',account_id:'account',card_id:null});
   const send=f.requests.find(r=>r.url.endsWith('/imports'));const body=JSON.parse(send.init.body);
   assert.equal(body.entity_id,'entity');assert.equal(body.account_id,'account');assert.equal('binding_id' in body,false);assert.equal(f.requests.some(r=>r.url.endsWith('/bindings')),false);
-  assert.equal(body.items[0].original_amount,'3000.00');assert.equal(body.capture_id,current.id);assert.equal(body.coverage.complete,false);
+  assert.equal(body.items[0].original_amount,'3000.00');assert.match(body.capture_id,/^[a-f0-9-]{36}$/);assert.equal(body.coverage.complete,false);
   assert.equal(send.init.credentials,'omit');assert.equal(send.init.redirect,'error');assert.equal(send.init.headers.Authorization,'Bearer synthetic-jwt');
   assert.ok(f.localStore['extension-import:user'].job);
 });
@@ -56,4 +56,12 @@ test('remembered destination is user scoped and is never an authorization grant'
  assert.equal((await f.transfer.handle({type:'transfer.context'},7)).selection.account_id,'account');
  await assert.rejects(f.transfer.handle({type:'transfer.send',capture_id:state.capture.id,entity_id:'entity',account_id:'foreign',card_id:null},7),/invalid_destination/);
  assert.equal((await f.transfer.handle({type:'transfer.context'},8)).capture,null);
+});
+
+test('retries reuse a transport ID while another destination gets its own send',async()=>{
+ const f=fixture();await f.transfer.stage(capture(),7);const {capture:c}=await f.transfer.handle({type:'transfer.context'},7);
+ const request={type:'transfer.send',capture_id:c.id,entity_id:'entity',account_id:'account',card_id:null};
+ await f.transfer.handle(request,7);await f.transfer.handle(request,7);await f.transfer.handle({...request,account_id:'account-2'},7);
+ const sends=f.requests.filter(r=>r.url.endsWith('/imports')).map(r=>JSON.parse(r.init.body));
+ assert.equal(sends[0].capture_id,sends[1].capture_id);assert.notEqual(sends[0].capture_id,sends[2].capture_id);
 });

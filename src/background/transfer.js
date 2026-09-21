@@ -30,7 +30,7 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
   }
   async function api(path, session, body) {
     const response = await fetcher(apiBase + path, { method: body ? 'POST' : 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30000) });
-    if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'sign_in_required' : response.status === 409 ? 'destination_conflict' : response.status === 429 ? 'import_busy' : 'import_unavailable');
+    if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'sign_in_required' : response.status === 409 ? 'capture_changed' : response.status === 429 ? 'import_busy' : 'import_unavailable');
     return response.json();
   }
   async function current(tabId) {
@@ -84,7 +84,11 @@ export function createTransfer({ chrome, getClient, apiBase, fetcher = fetch }) 
         const target = capture.product === 'card' ? entity?.cards.find(c=>c.id === message.card_id) : entity?.accounts.find(a=>a.id === message.account_id);
         if (!target) throw new Error('invalid_destination');
         const destination={entity_id:entity.id,account_id:capture.product==='card' ? target.account_id : target.id,card_id:capture.product==='card' ? target.id : null};
-        const envelope = { schema_version:1, ...destination, institution:capture.institution, product:capture.product, capture_id:capture.id, part_index:0, part_count:1, connector_version:chrome.runtime.getManifest().version, coverage:capture.coverage, items:capture.items };
+        // A destination is selected per send. Give each destination a stable
+        // transport UUID so retrying is safe without imposing a permanent link.
+        const sendHash=await digest(capture.id+':'+uid+':'+JSON.stringify(destination));
+        const sendId=sendHash.slice(0,8)+'-'+sendHash.slice(8,12)+'-4'+sendHash.slice(13,16)+'-8'+sendHash.slice(17,20)+'-'+sendHash.slice(20,32);
+        const envelope = { schema_version:1, ...destination, institution:capture.institution, product:capture.product, capture_id:sendId, part_index:0, part_count:1, connector_version:chrome.runtime.getManifest().version, coverage:capture.coverage, items:capture.items };
         const job = await api('/imports',session,envelope);
         await chrome.storage.local.set({ ['extension-import:' + uid]: {job:job.id}, ['destination:'+uid+':'+capture.source_key]:destination });
         return job;
