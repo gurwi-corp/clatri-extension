@@ -399,5 +399,20 @@ await new Promise(resolve => setTimeout(resolve, 0));
 check("no automatic download after selection changed mid-flight", downloads, 1);
 ok("a changed selection requires a new request", (spanish ? /selección cambió/ : /selection changed/).test(byId.msg.textContent));
 
+// A window the bank cut short is dropped and asked again in halves, so the
+// engine's running total steps back. The count on screen only moves forward.
+let report, finishSplit;
+NS.engine.fetchRange = ({ onProgress }) => { report = onProgress; return new Promise(resolve => { finishSplit = resolve; }); };
+byId.run.fire("click");
+const shown = () => Number(/\d+/.exec(byId.msg.textContent)?.[0]);
+report({ total: 20, page: 1, from: "2026-07-01", to: "2026-07-04" });
+check("progress shows the running total", shown(), 20);
+report({ total: 3, page: 1, from: "2026-07-01", to: "2026-07-02" });
+check("a retried window never makes the count go back", shown(), 20);
+report({ total: 24, page: 1, from: "2026-07-03", to: "2026-07-04" });
+check("and it keeps growing past it", shown(), 24);
+finishSplit({ transactions: [], truncated: false });
+await new Promise(resolve => setTimeout(resolve, 0));
+
 console.log(failures ? `\n${failures} failing check(s)\n` : "\nAll checks passed\n");
 process.exit(failures ? 1 : 0);

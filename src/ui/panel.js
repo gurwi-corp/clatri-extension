@@ -485,14 +485,20 @@
     ui.results = null;
     ui.resultsKey = null;
     say(t("Requesting transactions…"));
+    let seen = 0;
 
     try {
       const { transactions, rangeApplied, fetched, windows, truncated, covered, completion } = await engine.fetchRange({
         account,
         from: ui.from,
         to: ui.to,
-        onProgress: ({ total, page, from, to }) =>
-          say(locked ? t("{count} transactions so far… (page {page})", { count: total, page }) : t("{count} transactions so far… ({from} to {to})", { count: total, from, to })),
+        // When the bank cuts a window short the engine drops it and asks again
+        // in halves, so its running total steps back before it grows again. The
+        // same rows come back with the halves: the count shown only moves forward.
+        onProgress: ({ total, page, from, to }) => {
+          seen = Math.max(seen, total);
+          say(locked ? t("{count} transactions so far… (page {page})", { count: seen, page }) : t("{count} transactions so far… ({from} to {to})", { count: seen, from, to }));
+        },
       });
 
       ui.busy = false;
