@@ -170,6 +170,12 @@ button:disabled {
   color: #6b35bd;
   text-underline-offset: 3px;
 }
+.bank-note .link-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 5px;
+  vertical-align: -3px;
+}
 .text-button {
   padding: 10px 0;
   border: 0;
